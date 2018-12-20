@@ -7,7 +7,6 @@
 # Executables
 *.exe
 *.out
-bin/*
 
 # Debug files
 *.dSYM/
@@ -26,3 +25,6 @@ dkms.conf
 
 # Editor vscode
 .vscode
+
+# Builds
+build/*

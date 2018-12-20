@@ -1,4 +1,12 @@
 #---------------------------------------------------
+#	Directory with output compiled files
+#---------------------------------------------------
+OUT = ./build
+#---------------------------------------------------
+#	Directory with source files
+#---------------------------------------------------
+SRC = ./src
+#---------------------------------------------------
 #	Target file to be compiled
 #---------------------------------------------------
 MAIN = patriots
@@ -7,28 +15,32 @@ MAIN = patriots
 #---------------------------------------------------
 CC = gcc
 #---------------------------------------------------
-#	'ptask' object file to be linked
+#	External header files
 #---------------------------------------------------
-OBJ = ptask
+INCLUDES = -I./include
 #---------------------------------------------------
 #	Options to the compiler
 #---------------------------------------------------
-CFLAGS = -Wall -lrt -lm
+CFLAGS = ${INCLUDES} -Wall -lrt -lm
 #---------------------------------------------------
 #	Specify 'allegro' as external library
 #---------------------------------------------------
-LIBS = libptask.a -lpthread `allegro-config --libs`
-#---------------------------------------------------
-#	Dependencies
-#---------------------------------------------------
-$(MAIN): $(MAIN).o
-	$(CC) $(CFLAGS) $(LIBS) -o bin/$(MAIN) $(MAIN).o
+LIB_ALLEGRO = -lpthread `allegro-config --libs`
+LIB_PTASK = -L./lib
 
-$(MAIN).o: $(MAIN).c
-	$(CC) -c $(MAIN).c
+LIBS = ${LIB_PTASK} ${LIB_ALLEGRO}
+
+#---------------------------------------------------
+#	Default command to build: make
+#---------------------------------------------------
+${OUT}/$(MAIN): ${OUT}/$(MAIN).o
+	$(CC) $(CFLAGS) $(LIBS) -o $(OUT)/$(MAIN) ${OUT}/$(MAIN).o
+
+${OUT}/$(MAIN).o: ${SRC}/$(MAIN).c
+	$(CC) -c ${SRC}/$(MAIN).c -o ${OUT}/$(MAIN).o
 
 #---------------------------------------------------
 # Command to clean inline: make clean
 #---------------------------------------------------
 clean:
-	rm -rf *o $(MAIN)
+	rm $(OUT)/**.*

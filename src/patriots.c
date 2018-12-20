@@ -1,5 +1,5 @@
 #include "patriots.h"
 
-void main(void) {
+int main(void) {
     printf("HELLO WORLD!");
 }
