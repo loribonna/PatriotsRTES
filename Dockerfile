@@ -7,7 +7,7 @@ RUN apt-get -y install liballegro4.4 liballegro4-dev
 
 WORKDIR /app
 COPY . .
-RUN mkdir build
+RUN rm -rf build; mkdir build
 RUN make
 
 CMD [ "./build/patriots" ]
