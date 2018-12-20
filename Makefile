@@ -1,46 +1,29 @@
-#---------------------------------------------------
-#	Directory with output compiled files
-#---------------------------------------------------
+# Directory with output compiled files
 OUT = ./build
-#---------------------------------------------------
-#	Directory with source files
-#---------------------------------------------------
+# Source files
 SRC = ./src
-#---------------------------------------------------
-#	Target file to be compiled
-#---------------------------------------------------
+# Headers
+INCLUDE = ./include
+
+# Target file to be compiled
 MAIN = patriots
-#---------------------------------------------------
-#	Compiler to be used
-#---------------------------------------------------
+# Compiler to be used
 CC = gcc
-#---------------------------------------------------
-#	External header files
-#---------------------------------------------------
-INCLUDES = -I./include
-#---------------------------------------------------
-#	Options to the compiler
-#---------------------------------------------------
-CFLAGS = ${INCLUDES} -Wall -lrt -lm
-#---------------------------------------------------
-#	Specify 'allegro' as external library
-#---------------------------------------------------
+# Options to the compiler
+CFLAGS = -I${INCLUDE} -Wall -lrt -lm
+# Libraries
 LIB_ALLEGRO = -lpthread `allegro-config --libs`
 LIB_PTASK = -L./lib
 
 LIBS = ${LIB_PTASK} ${LIB_ALLEGRO}
 
-#---------------------------------------------------
-#	Default command to build: make
-#---------------------------------------------------
-${OUT}/$(MAIN): ${OUT}/$(MAIN).o
+# Default command to build: make
+$(MAIN): $(MAIN).o
 	$(CC) $(CFLAGS) $(LIBS) -o $(OUT)/$(MAIN) ${OUT}/$(MAIN).o
 
-${OUT}/$(MAIN).o: ${SRC}/$(MAIN).c
-	$(CC) -c ${SRC}/$(MAIN).c -o ${OUT}/$(MAIN).o
+$(MAIN).o: ${SRC}/$(MAIN).c
+	$(CC) $(CFLAGS) -c ${SRC}/$(MAIN).c -o ${OUT}/$(MAIN).o
 
-#---------------------------------------------------
 # Command to clean inline: make clean
-#---------------------------------------------------
 clean:
-	rm $(OUT)/**.*
+	rm $(OUT)/*
