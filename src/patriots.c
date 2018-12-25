@@ -1,15 +1,11 @@
 #include "patriots.h"
-#define XWIN 640
-#define YWIN 480
 
 void init()
 {
-    char s[80];
     allegro_init();
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
     clear_to_color(screen, 0);
     install_keyboard();
-    
 
     textout_centre_ex(screen, font, "Press SPACE", XWIN / 2, YWIN / 2,
                       14, 0);
