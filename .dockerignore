@@ -5,6 +5,7 @@ docker-compose*
 .gitignore
 .env
 build
+test
 *.o
 README.md
 LICENSE

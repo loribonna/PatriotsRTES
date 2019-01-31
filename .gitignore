@@ -28,3 +28,6 @@ dkms.conf
 
 # Builds
 build/*
+
+# Tests
+test/*
