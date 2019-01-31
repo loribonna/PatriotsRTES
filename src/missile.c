@@ -8,7 +8,7 @@ int missile_inside_borders(missile_t *missile)
            missile->y < 0;
 }
 
-int create_missile(BITMAP *buffer, missile_t *missile)
+int draw_missile(BITMAP *buffer, missile_t *missile)
 {
     int color;
 
