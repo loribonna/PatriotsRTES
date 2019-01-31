@@ -11,6 +11,10 @@
 
 #define XWIN 640
 #define YWIN 480
-#define N 4
+#define LBOX 2
+#define RBOX 638
+#define UBOX 2
+#define BBOX 478
+#define BKG_COLOR 0
 
 #endif

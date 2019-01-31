@@ -1,11 +1,40 @@
 #include "patriots.h"
 
+BITMAP *buffer;
+
+void draw_screen()
+{
+    blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
+}
+
+void reset_buffer()
+{
+    clear_to_color(buffer, 0);
+}
+
+void *screen_task(void *arg)
+{
+    int deadline;
+
+    deadline = *(int *)arg;
+
+    while (1)
+    {
+        rectfill(screen, 0, 0, XWIN, YWIN, BKG_COLOR);
+        
+        
+    }
+}
+
 void init()
 {
     allegro_init();
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
     clear_to_color(screen, 0);
     install_keyboard();
+
+    buffer = create_bitmap(XWIN, YWIN);
+    reset_buffer();
 
     textout_centre_ex(screen, font, "Press SPACE", XWIN / 2, YWIN / 2,
                       14, 0);
