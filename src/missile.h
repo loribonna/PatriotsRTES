@@ -5,7 +5,7 @@
 #include <math.h>
 #include "utils.h"
 
-#define MISSLE_RADIUS 2
+#define MISSILE_RADIUS 2
 #define ATTACKER_COLOR 4
 #define DEFENDER_COLOR 11
 #define DELTA 5
@@ -18,8 +18,8 @@ typedef enum
 
 typedef struct
 {
-    int x, y;
-    float angle;
+    float x, y;
+    float angle, speed;
     missile_type_t missile_type;
 } missile_t;
 

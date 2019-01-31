@@ -26,12 +26,12 @@ int create_missile(BITMAP *buffer, missile_t *missile)
         color = DEFENDER_COLOR;
     }
 
-    circlefill(buffer, missile->x, missile->y, MISSLE_RADIUS, color);
+    circlefill(buffer, missile->x, missile->y, MISSILE_RADIUS, color);
 
     return 0;
 }
 
-int missile_collide(missile_t *missileA, missile_t *missileB)
+int missiles_collide(missile_t *missileA, missile_t *missileB)
 {
     int distance;
 
@@ -43,11 +43,53 @@ int missile_collide(missile_t *missileA, missile_t *missileB)
             missileA->y,
             missileB->y);
 
-        if (distance <= MISSLE_RADIUS)
+        if (distance <= MISSILE_RADIUS)
         {
             return 1;
         }
+        else
+        {
+        }
+    }
+    else
+    {
+        return 1;
     }
 
     return 0;
+}
+
+int missile_collide_env(missile_t *missile, env_t *env)
+{
+    int x, y, distance;
+
+    sem_wait(&env->mutex);
+
+    for (x = 0; x < XWIN; x++)
+    {
+        for (y = 0; y < YWIN; y++)
+        {
+            distance = get_euclidean_distance(missile->x, x, missile->y, y);
+            if (env->cell[x][y] >= 0 && distance < MISSILE_RADIUS / 2)
+            {
+                sem_post(&env->mutex);
+                return 1;
+            }
+        }
+    }
+
+    sem_post(&env->mutex);
+
+    return 0;
+}
+
+void move_missile(missile_t *missile, float deltatime)
+{
+    float dx, dy;
+
+    dx = missile->speed * cos(missile->angle);
+    dy = missile->speed * sin(missile->angle);
+
+    missile->x += dx * deltatime;
+    missile->y += dy * deltatime;
 }
