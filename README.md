@@ -26,17 +26,26 @@ by the attacker, the defender thread must compute and update its direction
 on every cycle.
 
 A system cycle performs the following tasks:
-- If a random event occurs and the attacking queue is not full, 
-a new attacker missile thread is spawned by an attacker lancher.
-- If there is any attacker thread, update its position. If it has reached its 
-goal, update the score and exit.
-- If there are untracked attacking missiles and the defending queue is not full,
-a new defending missile thread is spawned by a defending launcher.
 - If there is any defender thread, update its position accordingly to the 
 assigned attacker missile position. If the assigned missile is reached,
 update score and destroy the assigned thread. If the assigned missile has
 reached is goal, or for some event no longer exists, exit.
+- If there is any attacker thread, update its position. If it has reached its 
+goal, update the score and exit.
 - Draw the position updates for the missiles involved.
+
+The defender launcher thread runs indipendently, frequently controlling the 
+screen in search of new, untracked, attacker missiles. For each enemy point
+found controls the environment to check if was already tracked.
+If there are untracked attacking missiles and the defending queue is not full,
+a new defending missile thread is spawned and the corresponding attacker index
+is marked as `tracked`.
+
+An attacker missile is marcked as `tracked` by setting a bit in the missile.
+
+The attacker launcher reacts on a keyboard event, spawning a new attacker
+missile if the queue is not full.
+The missile spawned has random speed and angle.
 
 ## Static parameters
 
