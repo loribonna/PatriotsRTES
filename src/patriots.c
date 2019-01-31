@@ -14,9 +14,9 @@ void init()
 
 void hello_task()
 {
-    printf("CHILD");
+    fprintf(stderr, "CHILD");
     char *arg = (char *)ptask_get_argument();
-    printf("HELLO from task: %s\n", (char *)arg);
+    fprintf(stderr, "HELLO from task: %s\n", (char *)arg);
 }
 
 int main(void)
@@ -41,6 +41,7 @@ int main(void)
         if (keypressed())
         {
             c = readkey();
+            printf("KEY %i\n", c);
             k = c >> 8;
         }
     } while (k != KEY_ESC);

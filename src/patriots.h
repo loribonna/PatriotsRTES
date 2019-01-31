@@ -11,5 +11,6 @@
 
 #define XWIN 640
 #define YWIN 480
+#define N 4
 
 #endif
