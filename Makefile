@@ -4,6 +4,12 @@ OUT_BUILD = ./build
 OUT_TEST = ./test
 # Source files
 SRC = ./src
+# Test files
+TEST_WILDCARD = $(wildcard $(SRC)/*.test.c)
+TEST_FILES = $(basename $(notdir $(TEST_WILDCARD)))
+TEST_OUTPUT_FILES = $(addprefix $(OUT_TEST)/, $(TEST_FILES))
+TEST_SOURCE_FILES = $(addprefix $(SRC)/, $(TEST_FILES))
+
 # Headers
 INCLUDE = ./include
 
@@ -20,32 +26,37 @@ LIB_PTASK = -L./lib -lptask
 LIBS = $(LIB_PTASK) $(LIB_ALLEGRO)
 
 # Default command to build: make
-build: $(OUT_BUILD)/$(MAIN)
+build: $(SRC)/$(MAIN)
+	$(OUT_BUILD)/$(MAIN): $(OUT_BUILD)/$(MAIN).o
+		$(CC) $(DEBUG) -o $(OUT_BUILD)/$(MAIN) $(OUT_BUILD)/$(MAIN).o $(LIBS) $(CFLAGS)
 
-$(OUT_BUILD)/$(MAIN): $(OUT_BUILD)/$(MAIN).o
-	$(CC) $(DEBUG) -o $(OUT_BUILD)/$(MAIN) $(OUT_BUILD)/$(MAIN).o $(LIBS) $(CFLAGS)
+	$(OUT_BUILD)/$(MAIN).o: $(SRC)/$(MAIN).c
+		$(CC) $(DEBUG) -c $(SRC)/$(MAIN).c -o $(OUT_BUILD)/$(MAIN).o $(CFLAGS)
 
-$(OUT_BUILD)/$(MAIN).o: $(SRC)/$(MAIN).c
-	$(CC) $(DEBUG) -c $(SRC)/$(MAIN).c -o $(OUT_BUILD)/$(MAIN).o $(CFLAGS)
+# Command build and run tests: make test
+test: clean-test build-test
+	$(foreach f, $(TEST_OUTPUT_FILES),./$f > $f.output.txt;)
 
-# Command to test
-test: $(OUT_TEST)/$(MAIN)
-	$(OUT_TEST)/$(MAIN) > $(OUT_TEST)/output.txt
+# Build test files: make build-test
+build-test: create-test-objs build-test-objs
 
-$(OUT_TEST)/$(MAIN): $(OUT_TEST)/$(MAIN).o
-	$(CC) -g -DTEST -o $(OUT_TEST)/$(MAIN) $(OUT_TEST)/$(MAIN).o $(LIBS) $(CFLAGS)
+create-test-objs: $(addsuffix .c, $(TEST_SOURCE_FILES))
+	$(foreach f, $^,$(CC) -g -DTEST -c $f \
+		-o $(OUT_TEST)/$(basename $(notdir $f)).o $(CFLAGS);)
 
-$(OUT_TEST)/$(MAIN).o: $(SRC)/$(MAIN).c
-	$(CC) -g -DTEST -c $(SRC)/$(MAIN).c -o $(OUT_TEST)/$(MAIN).o $(CFLAGS)
+build-test-objs: $(addsuffix .o, $(TEST_OUTPUT_FILES))
+	$(foreach f, $^,$(CC) -g -DTEST -o $(basename $f) $f $(CFLAGS);)
 
-# Command to clean inline: make clean
+# Command to clean: make clean
+clean:
+	make clean-build
+	
 clean-build:
 	rm -f $(OUT_BUILD)/*
 
 clean-test:
 	rm -f $(OUT_TEST)/*
 
-run:
-	make clean-build
-	make build
+# Command to build and run main: make run
+run: clean-build build
 	$(OUT_BUILD)/$(MAIN)
