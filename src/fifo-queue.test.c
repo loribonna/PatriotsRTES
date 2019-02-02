@@ -53,5 +53,7 @@ int main(void)
 
     pthread_attr_destroy(&attr);
 
+    printf("FIFO-QUEUE-TERMINATED\n");
+
     return 0;
 }

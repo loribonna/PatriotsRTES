@@ -2,13 +2,21 @@
 OUT_BUILD = ./build
 #Directory with output for test purposes
 OUT_TEST = ./test
+
 # Source files
 SRC = ./src
+SOURCE_WILDCARD = $(wildcard $(SRC)/*.c)
+SOURCE_FILE_NAMES = $(basename $(notdir $(SOURCE_WILDCARD)))
+
+# Build files - Test files filtered out
+SOURCE_WILDCARD_FILTERED = $(filter-out $(wildcard $(SRC)/*.test.c), $(SOURCE_WILDCARD))
+BUILD_OUTPUT_FILES = $(addprefix $(OUT_BUILD)/, $(SOURCE_WILDCARD_FILTERED))
+BUILD_FILES = $(addprefix $(SRC)/, $(SOURCE_WILDCARD_FILTERED))
+
 # Test files
 TEST_WILDCARD = $(wildcard $(SRC)/*.test.c)
 TEST_FILES = $(basename $(notdir $(TEST_WILDCARD)))
 TEST_OUTPUT_FILES = $(addprefix $(OUT_TEST)/, $(TEST_FILES))
-TEST_SOURCE_FILES = $(addprefix $(SRC)/, $(TEST_FILES))
 
 # Headers
 INCLUDE = ./include
@@ -25,27 +33,44 @@ LIB_PTASK = -L./lib -lptask
 
 LIBS = $(LIB_PTASK) $(LIB_ALLEGRO)
 
-# Default command to build: make
-build: $(SRC)/$(MAIN)
-	$(OUT_BUILD)/$(MAIN): $(OUT_BUILD)/$(MAIN).o
-		$(CC) $(DEBUG) -DNDEBUG -o $(OUT_BUILD)/$(MAIN) $(OUT_BUILD)/$(MAIN).o $(LIBS) $(CFLAGS)
+# ---------------------
+# SECTION: BUILD
+# ---------------------
 
-	$(OUT_BUILD)/$(MAIN).o: $(SRC)/$(MAIN).c
-		$(CC) $(DEBUG) -DNDEBUG -c $(SRC)/$(MAIN).c -o $(OUT_BUILD)/$(MAIN).o $(CFLAGS)
+# Default command to build: make
+build: clean compile link 
+
+compile: $(SOURCE_WILDCARD_FILTERED)
+	$(foreach f, $^, \
+		$(CC) -g -c $f -o $(OUT_BUILD)/$(basename $(notdir $f)).o $(CFLAGS);)
+
+link: $(addsuffix .o, $(BUILD_OUTPUT_FILES))
+	$(CC) $(DEBUG) -DNDEBUG -o $(OUT_BUILD)/$(MAIN) $(OUT_BUILD)/$(MAIN).o \
+		$^ $(LIBS) $(CFLAGS)
+
+# ---------------------
+# SECTION: TEST
+# ---------------------
 
 # Command build and run tests: make test
 test: clean-test build-test
 	$(foreach f, $(TEST_OUTPUT_FILES),./$f > $f.output.txt;)
 
 # Build test files: make build-test
-build-test: create-test-objs build-test-objs
+build-test: compile-all-test link-test-objs
 
-create-test-objs: $(addsuffix .c, $(TEST_SOURCE_FILES))
-	$(foreach f, $^,$(CC) -g -c $f \
-		-o $(OUT_TEST)/$(basename $(notdir $f)).o $(CFLAGS);)
+compile-all-test: $(SOURCE_WILDCARD)
+	$(foreach f, $^, \
+		$(CC) -g -c $f -o $(OUT_TEST)/$(basename $(notdir $f)).o $(CFLAGS);)
 
-build-test-objs: $(addsuffix .o, $(TEST_OUTPUT_FILES))
-	$(foreach f, $^,$(CC) -g -o $(basename $f) $f $(CFLAGS);)
+link-test-objs: $(addsuffix .o, $(TEST_OUTPUT_FILES))
+	$(foreach f, $^, \
+		$(CC) -g -o $(basename $f) $(addsuffix .o, $(basename $(basename $f))) \
+		$(basename $f).o $(LIBS) $(CFLAGS);)
+
+# ---------------------
+# SECTION: CLEAN
+# ---------------------
 
 # Command to clean: make clean
 clean:
@@ -56,6 +81,10 @@ clean-build:
 
 clean-test:
 	rm -f $(OUT_TEST)/*
+
+# ---------------------
+# SECTION: RUN
+# ---------------------
 
 # Command to build and run main: make run
 run: clean-build build
