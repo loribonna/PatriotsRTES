@@ -3,9 +3,7 @@
 
 #include <semaphore.h>
 #include <pthread.h>
-
-// queue length
-#define N 4
+#include "utils.h"
 
 struct private_sem_t
 {

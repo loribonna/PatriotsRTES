@@ -17,9 +17,4 @@
 #define BBOX 478
 #define BKG_COLOR 0
 
-typedef struct {
-    int cell[XWIN][YWIN];
-    sem_t mutex;
-} env_t;
-
 #endif

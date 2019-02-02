@@ -59,30 +59,6 @@ int missiles_collide(missile_t *missileA, missile_t *missileB)
     return 0;
 }
 
-int missile_collide_env(missile_t *missile, env_t *env)
-{
-    int x, y, distance;
-
-    sem_wait(&env->mutex);
-
-    for (x = 0; x < XWIN; x++)
-    {
-        for (y = 0; y < YWIN; y++)
-        {
-            distance = get_euclidean_distance(missile->x, x, missile->y, y);
-            if (env->cell[x][y] >= 0 && distance < MISSILE_RADIUS / 2)
-            {
-                sem_post(&env->mutex);
-                return 1;
-            }
-        }
-    }
-
-    sem_post(&env->mutex);
-
-    return 0;
-}
-
 void move_missile(missile_t *missile, float deltatime)
 {
     float dx, dy;
