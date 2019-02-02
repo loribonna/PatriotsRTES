@@ -3,6 +3,7 @@
 
 #include <semaphore.h>
 #include <pthread.h>
+#include "utils.h"
 
 // queue length
 #define N 4

@@ -28,10 +28,10 @@ LIBS = $(LIB_PTASK) $(LIB_ALLEGRO)
 # Default command to build: make
 build: $(SRC)/$(MAIN)
 	$(OUT_BUILD)/$(MAIN): $(OUT_BUILD)/$(MAIN).o
-		$(CC) $(DEBUG) -o $(OUT_BUILD)/$(MAIN) $(OUT_BUILD)/$(MAIN).o $(LIBS) $(CFLAGS)
+		$(CC) $(DEBUG) -DNDEBUG -o $(OUT_BUILD)/$(MAIN) $(OUT_BUILD)/$(MAIN).o $(LIBS) $(CFLAGS)
 
 	$(OUT_BUILD)/$(MAIN).o: $(SRC)/$(MAIN).c
-		$(CC) $(DEBUG) -c $(SRC)/$(MAIN).c -o $(OUT_BUILD)/$(MAIN).o $(CFLAGS)
+		$(CC) $(DEBUG) -DNDEBUG -c $(SRC)/$(MAIN).c -o $(OUT_BUILD)/$(MAIN).o $(CFLAGS)
 
 # Command build and run tests: make test
 test: clean-test build-test
@@ -41,11 +41,11 @@ test: clean-test build-test
 build-test: create-test-objs build-test-objs
 
 create-test-objs: $(addsuffix .c, $(TEST_SOURCE_FILES))
-	$(foreach f, $^,$(CC) -g -DTEST -c $f \
+	$(foreach f, $^,$(CC) -g -c $f \
 		-o $(OUT_TEST)/$(basename $(notdir $f)).o $(CFLAGS);)
 
 build-test-objs: $(addsuffix .o, $(TEST_OUTPUT_FILES))
-	$(foreach f, $^,$(CC) -g -DTEST -o $(basename $f) $f $(CFLAGS);)
+	$(foreach f, $^,$(CC) -g -o $(basename $f) $f $(CFLAGS);)
 
 # Command to clean: make clean
 clean:
