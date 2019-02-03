@@ -1,14 +1,14 @@
 #include "atk-missile.h"
 
-ptask *atk_thread(void *arg)
+ptask atk_thread(void)
 {
     missile_t *self;
-    int period, index, deltatime;
+    int index, deltatime;
     int oldx, oldy;
 
     index = ptask_get_index();
     deltatime = get_deltatime(index, MILLI);
-    self = arg;
+    self = ptask_get_argument();
 
     while (1)
     {
@@ -17,7 +17,7 @@ ptask *atk_thread(void *arg)
 
         move_missile(self, deltatime);
 
-        update_missile_position(oldx, oldy, missile, index);
+        update_missile_position(oldx, oldy, self, index);
 
         ptask_wait_for_period();
     }
@@ -29,7 +29,7 @@ void init_params(tpars *params, void *arg)
     ptask_param_period((*params), ATK_MISSILE_PERIOD, MILLI);
     ptask_param_priority((*params), ATK_MISSILE_PRIO);
     ptask_param_activation((*params), NOW);
-    ptask_param_arg(*params, arg);
+    params->arg = arg;
 }
 
 int launch_atk_thread(missile_t *missile)

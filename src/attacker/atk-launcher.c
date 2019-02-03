@@ -21,7 +21,7 @@ void launch_atk_missile()
     missile_t *missile;
     int index;
 
-    index = getNextEmptyItem(&atk_gestor.gestor);
+    index = get_next_empty_item(&atk_gestor.gestor);
 
     missile = &(atk_gestor.queue[index]);
 
@@ -30,13 +30,13 @@ void launch_atk_missile()
 
     if (launch_atk_thread(missile))
     {
-        addFullItem(&atk_gestor.gestor, index);
+        add_full_item(&atk_gestor.gestor, index);
     }
 }
 
 void *atk_launcher(void *arg)
 {
-    int key, index;
+    int key;
 
     do
     {
@@ -51,4 +51,11 @@ void *atk_launcher(void *arg)
             }
         }
     } while (key != KEY_ESC);
+
+    return 0;
+}
+
+//TODO
+void atk_missile_hit(int task) {
+    
 }

@@ -20,4 +20,14 @@ typedef struct
     struct private_sem_t full_sem;
 } fifo_queue_gestor_t;
 
+void init_queue(fifo_queue_gestor_t *gestor);
+
+int get_next_empty_item(fifo_queue_gestor_t *gestor);
+
+void add_full_item(fifo_queue_gestor_t *gestor, int index);
+
+int get_next_full_item(fifo_queue_gestor_t *gestor);
+
+void splice_full_item(fifo_queue_gestor_t *gestor, int index);
+
 #endif

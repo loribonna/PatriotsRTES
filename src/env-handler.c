@@ -89,7 +89,6 @@ void update_cell_value(int x, int y, int value, cell_type type)
 
 int update_missile_position(int oldx, int oldy, missile_t *missile, int task)
 {
-    cell_t temp;
     int newx, newy, new_type, safe;
 
     newx = (int)missile->x;

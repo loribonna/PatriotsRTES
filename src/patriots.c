@@ -2,7 +2,7 @@
 
 BITMAP *buffer;
 
-void draw_screen()
+void draw_buffer_to_screen()
 {
     blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
 }
@@ -12,7 +12,7 @@ void reset_buffer()
     clear_to_color(buffer, 0);
 }
 
-void *screen_task(void *arg)
+/*void *screen_task(void *arg)
 {
     int deadline;
 
@@ -24,7 +24,7 @@ void *screen_task(void *arg)
         
         
     }
-}
+}*/
 
 void init()
 {

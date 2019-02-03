@@ -1,6 +1,6 @@
 #include "fifo-queue.h"
 
-void initQueue(fifo_queue_gestor_t *gestor)
+void init_queue(fifo_queue_gestor_t *gestor)
 {
     gestor->freeIndex = 0;
     gestor->tailIndex = -1;
@@ -20,7 +20,7 @@ void initQueue(fifo_queue_gestor_t *gestor)
     gestor->full_sem.c = 0;
 }
 
-int getNextEmptyItem(fifo_queue_gestor_t *gestor)
+int get_next_empty_item(fifo_queue_gestor_t *gestor)
 {
     int index;
 
@@ -34,6 +34,8 @@ int getNextEmptyItem(fifo_queue_gestor_t *gestor)
         gestor->empty_sem.c--;
     }
 
+    assert(gestor->freeIndex >= 0);
+
     index = gestor->freeIndex;
     gestor->freeIndex = gestor->next[gestor->freeIndex];
 
@@ -42,9 +44,11 @@ int getNextEmptyItem(fifo_queue_gestor_t *gestor)
     return index;
 }
 
-void addFullItem(fifo_queue_gestor_t *gestor, int index)
+void add_full_item(fifo_queue_gestor_t *gestor, int index)
 {
     sem_wait(&(gestor->mutex_remove));
+
+    assert(index >= 0);
 
     gestor->next[index] = -1;
     if (gestor->headIndex < 0)
@@ -67,7 +71,7 @@ void addFullItem(fifo_queue_gestor_t *gestor, int index)
     }
 }
 
-int getNextFullItem(fifo_queue_gestor_t *gestor)
+int get_next_full_item(fifo_queue_gestor_t *gestor)
 {
     int index;
 
@@ -81,6 +85,8 @@ int getNextFullItem(fifo_queue_gestor_t *gestor)
         gestor->full_sem.c--;
     }
 
+    assert(gestor->headIndex >= 0);
+
     index = gestor->headIndex;
     gestor->headIndex = gestor->next[gestor->headIndex];
 
@@ -89,9 +95,11 @@ int getNextFullItem(fifo_queue_gestor_t *gestor)
     return index;
 }
 
-void spliceFullItem(fifo_queue_gestor_t *gestor, int index)
+void splice_full_item(fifo_queue_gestor_t *gestor, int index)
 {
     sem_wait(&(gestor->mutex_insert));
+
+    assert(index >= 0);
 
     gestor->next[index] = gestor->freeIndex;
     gestor->freeIndex = index;

@@ -3,8 +3,8 @@
 
 #include "patriots.h"
 #include "missile.h"
-#include "atk-launcher.h"
-#include "def-launcher.h"
+#include "./attacker/atk-launcher.h"
+#include "./defender/def-launcher.h"
 
 typedef enum {WALL, GOAL, EMPTY, ATK_MISSILE, DEF_MISSILE} cell_type;
 
