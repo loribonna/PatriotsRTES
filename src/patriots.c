@@ -1,17 +1,5 @@
 #include "patriots.h"
 
-BITMAP *buffer;
-
-void draw_buffer_to_screen()
-{
-    blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
-}
-
-void reset_buffer()
-{
-    clear_to_color(buffer, 0);
-}
-
 /*void *screen_task(void *arg)
 {
     int deadline;
@@ -28,16 +16,8 @@ void reset_buffer()
 
 void init()
 {
-    allegro_init();
-    set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
-    clear_to_color(screen, 0);
-    install_keyboard();
+    init_display();
 
-    buffer = create_bitmap(XWIN, YWIN);
-    reset_buffer();
-
-    textout_centre_ex(screen, font, "Press SPACE", XWIN / 2, YWIN / 2,
-                      14, 0);
     ptask_init(SCHED_FIFO, 1, 2);
 }
 
