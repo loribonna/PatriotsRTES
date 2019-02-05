@@ -24,12 +24,13 @@ typedef struct
 
 int missile_inside_borders(missile_t *missile);
 
-int draw_missile(BITMAP *buffer, missile_t *missile);
+int draw_missile(BITMAP *buffer, int x, int y, missile_type_t type);
 
 int missiles_collide(missile_t *missileA, missile_t *missileB);
 
 void move_missile(missile_t *missile, float deltatime);
 
 #include "env-handler.h"
+#include "display.h"
 
 #endif

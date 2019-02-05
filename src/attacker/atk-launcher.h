@@ -11,4 +11,6 @@
 
 void atk_missile_hit(int task);
 
+void atk_missile_goal(int task);
+
 #endif

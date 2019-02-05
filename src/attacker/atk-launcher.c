@@ -59,3 +59,7 @@ void *atk_launcher(void *arg)
 void atk_missile_hit(int task) {
     
 }
+
+void atk_missile_goal(int task) {
+    
+}

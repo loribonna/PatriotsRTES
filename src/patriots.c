@@ -1,22 +1,10 @@
 #include "patriots.h"
 
-/*void *screen_task(void *arg)
-{
-    int deadline;
-
-    deadline = *(int *)arg;
-
-    while (1)
-    {
-        rectfill(screen, 0, 0, XWIN, YWIN, BKG_COLOR);
-        
-        
-    }
-}*/
-
 void init()
 {
-    init_display();
+    display_init();
+
+    init_env();
 
     ptask_init(SCHED_FIFO, 1, 2);
 }

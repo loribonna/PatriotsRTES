@@ -2,22 +2,19 @@
 
 int missile_inside_borders(missile_t *missile)
 {
-    return missile->x >= XWIN ||
-           missile->y >= YWIN ||
-           missile->x < 0 ||
-           missile->y < 0;
+    return check_borders(missile->x, missile->y);
 }
 
-int draw_missile(BITMAP *buffer, missile_t *missile)
+int draw_missile(BITMAP *buffer, int x, int y, missile_type_t type)
 {
     int color;
 
-    if (missile_inside_borders(missile))
+    if (check_borders(x, y))
     {
         return -1;
     }
 
-    if (missile->missile_type == ATTACKER)
+    if (type == ATTACKER)
     {
         color = ATTACKER_COLOR;
     }
@@ -26,7 +23,7 @@ int draw_missile(BITMAP *buffer, missile_t *missile)
         color = DEFENDER_COLOR;
     }
 
-    circlefill(buffer, missile->x, missile->y, MISSILE_RADIUS, color);
+    circlefill(buffer, x, y, MISSILE_RADIUS, color);
 
     return 0;
 }
@@ -46,9 +43,6 @@ int missiles_collide(missile_t *missileA, missile_t *missileB)
         if (distance <= MISSILE_RADIUS)
         {
             return 1;
-        }
-        else
-        {
         }
     }
     else
