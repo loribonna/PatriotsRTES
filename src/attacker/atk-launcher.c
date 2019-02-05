@@ -6,6 +6,13 @@ struct
     fifo_queue_gestor_t gestor;
 } atk_gestor;
 
+void atk_wait() {
+    struct timespec t;
+    t.tv_sec = 0;
+    t.tv_nsec = ATK_SLEEP_DELAY;
+    nanosleep(&t,NULL);
+}
+
 void set_random_start(missile_t *missile)
 {
     missile->x = rand() % XWIN;
@@ -19,7 +26,7 @@ void set_random_start(missile_t *missile)
 void launch_atk_missile()
 {
     missile_t *missile;
-    int index;
+    int index, thread;
 
     index = get_next_empty_item(&atk_gestor.gestor);
 
@@ -28,10 +35,10 @@ void launch_atk_missile()
     missile->missile_type = ATTACKER;
     set_random_start(missile);
 
-    if (launch_atk_thread(missile))
-    {
-        add_full_item(&atk_gestor.gestor, index);
-    }
+    thread = launch_atk_thread(missile);
+    assert(thread >= 0);
+
+    add_full_item(&atk_gestor.gestor, index);
 }
 
 void *atk_launcher(void *arg)
@@ -48,14 +55,18 @@ void *atk_launcher(void *arg)
             if (key == KEY_SPACE)
             {
                 launch_atk_missile();
+                atk_wait();
             }
         }
+        ptask_wait_for_period();
+
     } while (key != KEY_ESC);
 
     return 0;
 }
 
 //TODO
-void atk_missile_hit(int task) {
+void atk_missile_hit(int task)
+{
     
 }
