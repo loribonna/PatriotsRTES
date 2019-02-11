@@ -16,7 +16,11 @@
 #define BKG_COLOR 0
 #define WALL_COLOR 6
 #define GOAL_COLOR 10
-#define TEXT_COLOR 14
+#define LABEL_COLOR 14
+
+#define LABEL_LEN 20
+#define LABEL_X (XWIN * 0.1)
+#define LABEL_Y (YWIN * 0.2)
 
 #define DISPLAY_PERIOD 10
 #define DISPLAY_PRIO 5
@@ -36,6 +40,8 @@ int check_borders(int x, int y);
 void draw_wall(int x, int y, BITMAP *buffer);
 
 void draw_goal(int x, int y, BITMAP *buffer);
+
+void draw_labels(BITMAP *buffer, int atk_p, int def_p);
 
 #include "env-handler.h"
 

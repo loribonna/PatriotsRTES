@@ -65,6 +65,8 @@ void init_env()
 {
     int x, y;
 
+    env.atk_points = env.def_points = 0;
+
     for (x = 0; x < XWIN; x++)
     {
         for (y = 0; y < YWIN; y++)
@@ -100,14 +102,14 @@ int is_goal_cell(cell_t cell)
            cell.value == OTHER_CELL;
 }
 
-// TODO:
 void def_point()
 {
+    env.def_points++;
 }
 
-// TODO
 void atk_point()
 {
+    env.atk_points++;
 }
 
 int handle_collision_by_cell_type(cell_t cell)
@@ -251,6 +253,8 @@ void draw_env(BITMAP *buffer)
     int x, y;
 
     sem_wait(&env.mutex);
+
+    draw_labels(buffer, env.atk_points, env.def_points);
 
     for (x = 0; x < XWIN; x++)
     {

@@ -8,7 +8,7 @@
 #include <allegro.h>
 
 #define WALL_THICKNESS 2
-#define GOAL_START_Y (YWIN - YWIN*0.8)
+#define GOAL_START_Y (YWIN - YWIN * 0.8)
 #define EMPTY_CELL -1
 #define OTHER_CELL -2
 
@@ -30,6 +30,7 @@ typedef struct
 typedef struct
 {
     cell_t cell[XWIN][YWIN];
+    int def_points, atk_points;
     sem_t mutex;
 } env_t;
 

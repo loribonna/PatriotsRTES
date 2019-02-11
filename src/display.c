@@ -17,9 +17,9 @@ void display_init()
 
     buffer = create_bitmap(XWIN, YWIN);
     reset_buffer();
-    
+
     textout_centre_ex(screen, font, "Press SPACE", XWIN / 2, 20,
-                      TEXT_COLOR, BKG_COLOR);
+                      LABEL_COLOR, BKG_COLOR);
 }
 
 int check_borders(int x, int y)
@@ -65,4 +65,12 @@ void draw_wall(int x, int y, BITMAP *buffer)
 void draw_goal(int x, int y, BITMAP *buffer)
 {
     putpixel(buffer, x, y, GOAL_COLOR);
+}
+
+void draw_labels(BITMAP *buffer, int atk_p, int def_p)
+{
+    char s[LABEL_LEN];
+
+    sprintf(s, "Attack points: %i\nDefender points: %i\n", atk_p, def_p);
+    textout_ex(buffer, font, s, LABEL_X, LABEL_Y, LABEL_COLOR, BKG_COLOR);
 }
