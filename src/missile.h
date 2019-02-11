@@ -19,8 +19,16 @@ typedef struct
 {
     float x, y;
     float angle, speed;
+    int index;
+    sem_t deleted;
     missile_type_t missile_type;
 } missile_t;
+
+void delete_missile(missile_t* missile);
+
+void init_missile(missile_t* missile);
+
+int is_deleted(missile_t* missile);
 
 int missile_inside_borders(missile_t *missile);
 

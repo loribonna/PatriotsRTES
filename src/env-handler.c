@@ -74,30 +74,6 @@ void init_env()
     }
 }
 
-cell_t get_object_type_around(int x, int y, int span)
-{
-    int xa, ya, xb, yb;
-
-    xa = x - span >= 0 ? x - span : 0;
-    ya = y - span >= 0 ? y - span : 0;
-
-    xb = x + span < XWIN ? x + span : XWIN - 1;
-    yb = y + span < YWIN ? y + span : YWIN - 1;
-
-    for (; xa < xb; xa++)
-    {
-        for (; ya < yb; ya++)
-        {
-            if (env.cell[x][y].type != EMPTY)
-            {
-                return env.cell[xa][ya];
-            }
-        }
-    }
-
-    return init_cell_empty();
-}
-
 int is_empty_cell(cell_t cell)
 {
     return (cell.type == EMPTY) ||
@@ -124,45 +100,105 @@ int is_goal_cell(cell_t cell)
            cell.value == OTHER_CELL;
 }
 
+// TODO:
+void def_point()
+{
+}
+
+// TODO
+void atk_point()
+{
+}
+
 int handle_collision_by_cell_type(cell_t cell)
 {
-    int safe;
+    int collided;
+
+    collided = 1;
 
     switch (cell.type)
     {
     case WALL:
-        safe = 0;
-        break;
-    case DEF_MISSILE:
-        safe = 0;
-        def_missile_hit(cell.value);
-        break;
-    case ATK_MISSILE:
-        safe = 0;
-        atk_missile_hit(cell.value);
         break;
     case GOAL:
-        safe = 0;
-        atk_missile_goal(cell.value);
+        break;
+    case DEF_MISSILE:
+        delete_def_missile(cell.value);
+        break;
+    case ATK_MISSILE:
+        delete_atk_missile(cell.value);
         break;
     default:
-        safe = 1;
+        collided = 0;
         break;
     }
 
-    return safe;
+    return collided;
+}
+
+int handle_collision(missile_type_t missile_type, cell_t cell)
+{
+    int collided;
+
+    collided = handle_collision_by_cell_type(cell);
+
+    if (collided)
+    {
+        if (
+            (missile_type == ATTACKER && cell.type == DEF_MISSILE) ||
+            (missile_type == DEFENDER && cell.type == ATK_MISSILE))
+        {
+            def_point();
+        }
+        if (missile_type == ATTACKER && cell.type == GOAL)
+        {
+            atk_point();
+        }
+    }
+
+    return collided;
+}
+
+int handle_collisions_around(missile_t *missile, int span)
+{
+    int xa, ya, xb, yb, colls;
+    missile_type_t missile_type;
+
+    colls = 0;
+    missile_type = missile->missile_type;
+
+    xa = missile->x - span >= 0 ? missile->x - span : 0;
+    ya = missile->y - span >= 0 ? missile->y - span : 0;
+
+    xb = missile->x + span < XWIN ? missile->x + span : XWIN - 1;
+    yb = missile->y + span < YWIN ? missile->y + span : YWIN - 1;
+
+    for (; xa < xb; xa++)
+    {
+        for (; ya < yb; ya++)
+        {
+            if (env.cell[xa][ya].type != EMPTY)
+            {
+                colls += handle_collision(missile_type, env.cell[xa][ya]);
+            }
+        }
+    }
+
+    return colls;
 }
 
 int handle_missile_collisions(missile_t *missile)
 {
-    int ret;
+    int collisions;
     cell_t cell;
 
-    cell = get_object_type_around(missile->x, missile->y, MISSILE_RADIUS);
+    sem_wait(&env.mutex);
 
-    ret = handle_collision_by_cell_type(cell);
+    collisions = handle_collisions_around(missile, MISSILE_RADIUS);
 
-    return ret;
+    sem_post(&env.mutex);
+
+    return collisions;
 }
 
 void update_cell_value(int x, int y, int value, cell_type type)
@@ -171,7 +207,7 @@ void update_cell_value(int x, int y, int value, cell_type type)
     env.cell[x][y].type = type;
 }
 
-int update_missile_position(int oldx, int oldy, missile_t *missile, int task)
+int update_missile_position(int oldx, int oldy, missile_t *missile)
 {
     int newx, newy, new_type, safe;
 
@@ -185,7 +221,7 @@ int update_missile_position(int oldx, int oldy, missile_t *missile, int task)
 
     if (safe)
     {
-        update_cell_value(newx, newy, task, new_type);
+        update_cell_value(newx, newy, missile->index, new_type);
         env.cell[oldx][oldy] = init_cell_empty();
     }
 

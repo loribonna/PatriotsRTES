@@ -3,21 +3,21 @@
 ptask atk_thread(void)
 {
     missile_t *self;
-    int index, deltatime;
+    int task_index, deltatime;
     int oldx, oldy;
 
-    index = ptask_get_index();
-    deltatime = get_deltatime(index, MILLI);
+    task_index = ptask_get_index();
+    deltatime = get_deltatime(task_index, MILLI);
     self = ptask_get_argument();
 
-    while (1)
+    while (!is_deleted(self))
     {
         oldx = self->x;
         oldy = self->y;
 
         move_missile(self, deltatime);
 
-        update_missile_position(oldx, oldy, self, index);
+        update_missile_position(oldx, oldy, self);
 
         ptask_wait_for_period();
     }
