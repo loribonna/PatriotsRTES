@@ -20,7 +20,7 @@ typedef struct {
 
 int check_missile_collisions(missile_t *missile);
 
-int update_missile_position(int oldx, int oldy, missile_t *missile, int task);
+int update_missile_position(int oldx, int oldy, missile_t *missile);
 
 void init_env(int wall_border, int goal_margin);
 

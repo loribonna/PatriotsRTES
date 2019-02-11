@@ -11,6 +11,6 @@
 #define MAX_ANGLE 30
 #define ATK_SLEEP_DELAY 500 * 1000 * 1000 // 500 milliseconds
 
-void atk_missile_hit(int task);
+void delete_atk_missile(int index);
 
 #endif

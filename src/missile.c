@@ -1,5 +1,13 @@
 #include "missile.h"
 
+void init_missile(missile_t *missile)
+{
+    sem_init(&missile->deleted, 0, 0);
+    missile->speed = missile->angle = 0;
+    missile->x = missile->y = 0;
+    missile->index = -1;
+}
+
 int missile_inside_borders(missile_t *missile)
 {
     return missile->x >= XWIN ||
@@ -29,6 +37,20 @@ int draw_missile(BITMAP *buffer, missile_t *missile)
     circlefill(buffer, missile->x, missile->y, MISSILE_RADIUS, color);
 
     return 0;
+}
+
+void delete_missile(missile_t *missile)
+{
+    sem_post(&missile->deleted);
+}
+
+int is_deleted(missile_t *missile)
+{
+    int sval;
+
+    sem_getvalue(&missile->deleted, &sval);
+
+    return sval;
 }
 
 int missiles_collide(missile_t *missileA, missile_t *missileB)
