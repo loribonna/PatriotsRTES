@@ -19,7 +19,7 @@ ptask atk_thread(void)
         ptask_wait_for_period();
     }
 
-    init_missile(self);
+    delete_atk_missile(self->index);
 }
 
 void init_params(tpars *params, void *arg)

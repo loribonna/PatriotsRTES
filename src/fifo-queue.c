@@ -20,7 +20,7 @@ void init_queue(fifo_queue_gestor_t *gestor)
     gestor->full_sem.c = 0;
 }
 
-int is_query_full(fifo_queue_gestor_t *gestor) {
+int is_queue_full(fifo_queue_gestor_t *gestor) {
     int ret;
 
     sem_wait(&(gestor->mutex_insert));

@@ -20,7 +20,7 @@ typedef struct
     struct private_sem_t full_sem;
 } fifo_queue_gestor_t;
 
-int is_query_full(fifo_queue_gestor_t *gestor);
+int is_queue_full(fifo_queue_gestor_t *gestor);
 
 void init_queue(fifo_queue_gestor_t *gestor);
 
