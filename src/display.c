@@ -17,22 +17,23 @@ void display_init()
 
     buffer = create_bitmap(XWIN, YWIN);
     reset_buffer();
-
-    textout_centre_ex(screen, font, "Press SPACE", XWIN / 2, 20,
-                      LABEL_COLOR, BKG_COLOR);
 }
 
 int check_borders(int x, int y)
 {
-    return x >= XWIN ||
-           y >= YWIN ||
-           x < 0 ||
-           y < 0;
+    return x < XWIN &&
+           y < YWIN &&
+           x >= 0 &&
+           y >= 0;
 }
 
 void draw_buffer_to_screen()
 {
+    sem_wait(&env.mutex);
+
     blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
+    
+    sem_post(&env.mutex);
 }
 
 ptask display_manager(void)
@@ -101,6 +102,9 @@ void draw_legends(BITMAP *buffer)
 void draw_labels(BITMAP *buffer, int atk_p, int def_p)
 {
     char s[LABEL_LEN];
+
+    textout_centre_ex(buffer, font, "Press SPACE", XWIN / 2, 20,
+                      LABEL_COLOR, BKG_COLOR);
 
     sprintf(s, "Attack points: %i", atk_p);
     textout_ex(buffer, font, s, LABEL_X,

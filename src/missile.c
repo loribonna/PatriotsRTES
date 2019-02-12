@@ -8,16 +8,11 @@ void init_missile(missile_t *missile)
     missile->index = -1;
 }
 
-int missile_inside_borders(missile_t *missile)
-{
-    return check_borders(missile->x, missile->y);
-}
-
 int draw_missile(BITMAP *buffer, int x, int y, missile_type_t type)
 {
     int color;
 
-    if (check_borders(x, y))
+    if (!check_borders(x, y))
     {
         return -1;
     }
@@ -50,38 +45,21 @@ int is_deleted(missile_t *missile)
     return sval;
 }
 
-int missiles_collide(missile_t *missileA, missile_t *missileB)
-{
-    int distance;
-
-    if (missile_inside_borders(missileA) && missile_inside_borders(missileB))
-    {
-        distance = get_euclidean_distance(
-            missileA->x,
-            missileB->x,
-            missileA->y,
-            missileB->y);
-
-        if (distance <= MISSILE_RADIUS)
-        {
-            return 1;
-        }
-    }
-    else
-    {
-        return 1;
-    }
-
-    return 0;
-}
-
 void move_missile(missile_t *missile, float deltatime)
 {
-    float dx, dy;
+    float dx, dy, angle_rad;
 
-    dx = missile->speed * cos(missile->angle);
-    dy = missile->speed * sin(missile->angle);
+    angle_rad = missile->angle * (M_PI / 180);
+
+    dx = missile->speed * cos(angle_rad);
+    dy = missile->speed * sin(angle_rad);
 
     missile->x += dx * deltatime;
     missile->y += dy * deltatime;
+}
+
+void print_missile(missile_t *missile)
+{
+    fprintf(stderr, "i: %i, x: %f, y: %f, angle: %f\n",
+            missile->index, missile->x, missile->y, missile->angle);
 }
