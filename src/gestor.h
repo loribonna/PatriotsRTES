@@ -75,8 +75,6 @@ void init_gestor();
 
 float frand(float min, float max);
 
-int get_euclidean_distance(float xa, float xb, float ya, float yb);
-
 float get_deltatime(int task_index, int unit);
 
 int check_missile_collisions(missile_t *missile);

@@ -61,29 +61,13 @@ void init_launchers();
 
 int is_queue_full(fifo_queue_gestor_t *gestor);
 
-void init_queue(fifo_queue_gestor_t *gestor);
-
 int get_next_empty_item(fifo_queue_gestor_t *gestor);
 
 void add_full_item(fifo_queue_gestor_t *gestor, int index);
 
-int get_next_full_item(fifo_queue_gestor_t *gestor);
-
-void splice_full_item(fifo_queue_gestor_t *gestor, int index);
-
-void print_missile(missile_t *missile);
-
-void delete_missile(missile_t *missile);
-
-void init_missile(missile_t *missile);
-
-int is_deleted(missile_t *missile);
-
 int draw_missile(BITMAP *buffer, int x, int y, missile_type_t type);
 
 void move_missile(missile_t *missile, float deltatime);
-
-int launch_atk_thread(missile_t* missile);
 
 void delete_atk_missile(int index);
 

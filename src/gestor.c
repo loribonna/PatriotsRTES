@@ -98,6 +98,17 @@ void init_gestor()
     init_env();
 }
 
+/**
+ * COMMON FUNCTIONS
+ */
+
+int check_borders(int x, int y)
+{
+    return x < XWIN &&
+           y < YWIN &&
+           x >= 0 &&
+           y >= 0;
+}
 
 float frand(float min, float max)
 {
@@ -107,53 +118,56 @@ float frand(float min, float max)
     return min + (max - min) * r;
 }
 
-int get_euclidean_distance(float xa, float xb, float ya, float yb)
-{
-    return sqrt(pow(xa - xb, 2) + pow(ya - yb, 2));
-}
-
 float get_deltatime(int task_index, int unit)
 {
     return (float)ptask_get_period(task_index, unit) / DELTA_FACTOR;
 }
 
-int is_empty_cell(cell_t *cell)
+/**
+ * CELLS CHECK
+ */
+
+static int is_empty_cell(cell_t *cell)
 {
     return (cell->type == EMPTY) ||
            (cell->value == EMPTY_CELL);
 }
 
-int is_missile_cell(cell_t *cell)
+static int is_missile_cell(cell_t *cell)
 {
     return !is_empty_cell(cell) &&
            (cell->type == ATK_MISSILE || cell->type == DEF_MISSILE);
 }
 
-int is_wall_cell(cell_t *cell)
+static int is_wall_cell(cell_t *cell)
 {
     return !is_empty_cell(cell) &&
            cell->type == WALL &&
            cell->value == OTHER_CELL;
 }
 
-int is_goal_cell(cell_t *cell)
+static int is_goal_cell(cell_t *cell)
 {
     return !is_empty_cell(cell) &&
            cell->type == GOAL &&
            cell->value == OTHER_CELL;
 }
 
-void def_point()
+/**
+ * COLLISIONS MANAGEMENT
+ */
+
+static void def_point()
 {
     env.def_points++;
 }
 
-void atk_point()
+static void atk_point()
 {
     env.atk_points++;
 }
 
-int handle_collision_by_cell_type(cell_t *cell)
+static int handle_collision_by_cell_type(cell_t *cell)
 {
     int collided;
 
@@ -181,7 +195,7 @@ int handle_collision_by_cell_type(cell_t *cell)
     return collided;
 }
 
-int handle_collision(missile_type_t missile_type, cell_t *cell)
+static int handle_collision(missile_type_t missile_type, cell_t *cell)
 {
     int collided;
 
@@ -204,7 +218,7 @@ int handle_collision(missile_type_t missile_type, cell_t *cell)
     return collided;
 }
 
-int check_around_point(int xa, int ya, int xb, int yb, missile_t *missile)
+static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
 {
     int x, y;
     missile_type_t missile_type;
@@ -227,7 +241,7 @@ int check_around_point(int xa, int ya, int xb, int yb, missile_t *missile)
     return 0;
 }
 
-int handle_collisions_around_missile(missile_t *missile, int span)
+static int handle_collisions_around_missile(missile_t *missile, int span)
 {
     int xa, ya, xb, yb;
 
@@ -241,10 +255,10 @@ int handle_collisions_around_missile(missile_t *missile, int span)
     xb = missile->x + span < XWIN ? missile->x + span : XWIN;
     yb = missile->y + span < YWIN ? missile->y + span : YWIN;
 
-    return check_around_point(xa, ya, xb, yb, missile);
+    return collision_around(xa, ya, xb, yb, missile);
 }
 
-void update_cell_value(int x, int y, int value, cell_type type)
+static void update_cell_value(int x, int y, int value, cell_type type)
 {
     env.cell[x][y].value = value;
     env.cell[x][y].type = type;
@@ -279,7 +293,11 @@ int update_missile_position(missile_t *missile, float deltatime)
     return collisions;
 }
 
-void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
+/**
+ * ENVIRONMENT DRAW
+ */
+
+static void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
 {
     missile_type_t m_type;
 
@@ -320,15 +338,11 @@ void draw_env(BITMAP *buffer)
     sem_post(&env.mutex);
 }
 
-int check_borders(int x, int y)
-{
-    return x < XWIN &&
-           y < YWIN &&
-           x >= 0 &&
-           y >= 0;
-}
+/**
+ * SCREEN DRAW
+ */
 
-void draw_buffer_to_screen()
+static void draw_buffer_to_screen()
 {
     sem_wait(&env.mutex);
 
@@ -337,7 +351,63 @@ void draw_buffer_to_screen()
     sem_post(&env.mutex);
 }
 
-ptask display_manager(void)
+void draw_wall(int x, int y, BITMAP *buffer)
+{
+    putpixel(buffer, x, y, WALL_COLOR);
+}
+
+void draw_goal(int x, int y, BITMAP *buffer)
+{
+    putpixel(buffer, x, y, GOAL_COLOR);
+}
+
+static void draw_legend(BITMAP *buffer, int spaces, int color, char *label)
+{
+    int divergence, y_start, y_end;
+
+    divergence = spaces * (SPACING + RECT_H);
+    y_end = LEGEND_Y + divergence + RECT_H;
+    y_start = LEGEND_Y + divergence;
+
+    rectfill(buffer, LEGEND_X - RECT_W, y_end, LEGEND_X, y_start, color);
+    textout_ex(buffer, font, label,
+               LEGEND_X + SPACING, y_start, LABEL_COLOR, BKG_COLOR);
+}
+
+static void draw_legends(BITMAP *buffer)
+{
+    draw_legend(buffer, 0, GOAL_COLOR, ": GOAL");
+
+    draw_legend(buffer, 1, WALL_COLOR, ": WALL");
+
+    draw_legend(buffer, 2, ATTACKER_COLOR, ": ATK MISSILE");
+
+    draw_legend(buffer, 3, DEFENDER_COLOR, ": DEF MISSILE");
+}
+
+void draw_labels(BITMAP *buffer, int atk_p, int def_p)
+{
+    char s[LABEL_LEN];
+
+    textout_centre_ex(buffer, font, "Press SPACE", XWIN / 2, 20,
+                      LABEL_COLOR, BKG_COLOR);
+
+    sprintf(s, "Attack points: %i", atk_p);
+    textout_ex(buffer, font, s, LABEL_X,
+               get_y_label(1), LABEL_COLOR, BKG_COLOR);
+
+    sprintf(s, "Defender points: %i", def_p);
+    textout_ex(buffer, font, s, LABEL_X,
+               get_y_label(2), LABEL_COLOR, BKG_COLOR);
+
+    draw_legends(buffer);
+}
+
+/**
+ * THREAD MANAGERS
+ */
+
+static ptask display_manager(void)
 {
     while (1)
     {
@@ -363,57 +433,4 @@ void launch_display_manager()
     assert(task >= 0);
 
     fprintf(stderr, "Created DISPLAY manager\n");
-}
-
-void draw_wall(int x, int y, BITMAP *buffer)
-{
-    putpixel(buffer, x, y, WALL_COLOR);
-}
-
-void draw_goal(int x, int y, BITMAP *buffer)
-{
-    putpixel(buffer, x, y, GOAL_COLOR);
-}
-
-void draw_legend_label(BITMAP *buffer, int spaces, int color, char *label)
-{
-    int divergence, y_start, y_end;
-
-    divergence = spaces * (SPACING + RECT_H);
-    y_end = LEGEND_Y + divergence + RECT_H;
-    y_start = LEGEND_Y + divergence;
-
-    rectfill(buffer, LEGEND_X - RECT_W, y_end, LEGEND_X, y_start, color);
-    textout_ex(buffer, font, label,
-               LEGEND_X + SPACING, y_start, LABEL_COLOR, BKG_COLOR);
-}
-
-void draw_legends(BITMAP *buffer)
-{
-
-    draw_legend_label(buffer, 0, GOAL_COLOR, ": GOAL");
-
-    draw_legend_label(buffer, 1, WALL_COLOR, ": WALL");
-
-    draw_legend_label(buffer, 2, ATTACKER_COLOR, ": ATK MISSILE");
-
-    draw_legend_label(buffer, 3, DEFENDER_COLOR, ": DEF MISSILE");
-}
-
-void draw_labels(BITMAP *buffer, int atk_p, int def_p)
-{
-    char s[LABEL_LEN];
-
-    textout_centre_ex(buffer, font, "Press SPACE", XWIN / 2, 20,
-                      LABEL_COLOR, BKG_COLOR);
-
-    sprintf(s, "Attack points: %i", atk_p);
-    textout_ex(buffer, font, s, LABEL_X,
-               get_y_label(1), LABEL_COLOR, BKG_COLOR);
-
-    sprintf(s, "Defender points: %i", def_p);
-    textout_ex(buffer, font, s, LABEL_X,
-               get_y_label(2), LABEL_COLOR, BKG_COLOR);
-
-    draw_legends(buffer);
 }
