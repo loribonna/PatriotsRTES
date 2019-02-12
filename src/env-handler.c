@@ -74,6 +74,8 @@ void init_env()
             init_cell(x, y);
         }
     }
+
+    sem_init(&env.mutex, 0, 1);
 }
 
 int is_empty_cell(cell_t cell)
@@ -192,7 +194,6 @@ int handle_collisions_around(missile_t *missile, int span)
 int handle_missile_collisions(missile_t *missile)
 {
     int collisions;
-    cell_t cell;
 
     sem_wait(&env.mutex);
 
@@ -254,8 +255,6 @@ void draw_env(BITMAP *buffer)
 
     sem_wait(&env.mutex);
 
-    draw_labels(buffer, env.atk_points, env.def_points);
-
     for (x = 0; x < XWIN; x++)
     {
         for (y = 0; y < YWIN; y++)
@@ -266,6 +265,8 @@ void draw_env(BITMAP *buffer)
             }
         }
     }
+
+    draw_labels(buffer, env.atk_points, env.def_points);
 
     sem_post(&env.mutex);
 }

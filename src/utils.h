@@ -16,10 +16,4 @@ int get_euclidean_distance(float xa, float xb, float ya, float yb);
 
 float get_deltatime(int task_index, int unit);
 
-#ifndef TEST
-
-#define NDEBUG
-
-#endif
-
 #endif

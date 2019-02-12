@@ -6,13 +6,6 @@ struct
     fifo_queue_gestor_t gestor;
 } atk_gestor;
 
-void init_atk_missile(missile_t *missile, int index)
-{
-    init_missile(missile);
-    missile->missile_type = ATTACKER;
-    set_random_start(missile);
-}
-
 void atk_wait()
 {
     struct timespec t;
@@ -28,6 +21,13 @@ void set_random_start(missile_t *missile)
 
     missile->speed = rand() % MAX_SPEED;
     missile->angle = frand(-MAX_ANGLE, MAX_ANGLE);
+}
+
+void init_atk_missile(missile_t *missile, int index)
+{
+    init_missile(missile);
+    missile->missile_type = ATTACKER;
+    set_random_start(missile);
 }
 
 // BLOCKING if the queue is full
@@ -47,7 +47,7 @@ void launch_atk_missile()
     add_full_item(&atk_gestor.gestor, index);
 }
 
-void *atk_launcher(void *arg)
+ptask atk_launcher()
 {
     int key;
 
@@ -67,8 +67,20 @@ void *atk_launcher(void *arg)
         ptask_wait_for_period();
 
     } while (key != KEY_ESC);
+}
 
-    return 0;
+void launch_atk_launcher()
+{
+    int task;
+
+    task = ptask_create_prio(atk_launcher,
+                             ATK_LAUNCHER_PERIOD,
+                             ATK_LAUNCHER_PRIO,
+                             NOW);
+
+    assert(task >= 0);
+
+    fprintf(stderr, "Created ATK launcher\n");
 }
 
 void delete_atk_missile(int index)

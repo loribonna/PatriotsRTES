@@ -9,5 +9,6 @@
 #include <assert.h>
 
 #include "display.h"
+#include "attacker/atk-launcher.h"
 
 #endif

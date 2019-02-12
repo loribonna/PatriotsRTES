@@ -8,7 +8,7 @@
 #include <allegro.h>
 
 #define WALL_THICKNESS 2
-#define GOAL_START_Y (YWIN - YWIN * 0.8)
+#define GOAL_START_Y (YWIN * 0.8)
 #define EMPTY_CELL -1
 #define OTHER_CELL -2
 

@@ -49,12 +49,18 @@ ptask display_manager(void)
     }
 }
 
-int launch_display_manager()
+void launch_display_manager()
 {
-    return ptask_create_prio(display_manager,
+    int task;
+
+    task = ptask_create_prio(display_manager,
                              DISPLAY_PERIOD,
                              DISPLAY_PRIO,
                              NOW);
+
+    assert(task >= 0);
+
+    fprintf(stderr, "Created DISPLAY manager\n");
 }
 
 void draw_wall(int x, int y, BITMAP *buffer)
@@ -67,10 +73,42 @@ void draw_goal(int x, int y, BITMAP *buffer)
     putpixel(buffer, x, y, GOAL_COLOR);
 }
 
+void draw_legend_label(BITMAP *buffer, int spaces, int color, char *label)
+{
+    int divergence, y_start, y_end;
+
+    divergence = spaces * (SPACING + RECT_H);
+    y_end = LEGEND_Y + divergence + RECT_H;
+    y_start = LEGEND_Y + divergence;
+
+    rectfill(buffer, LEGEND_X - RECT_W, y_end, LEGEND_X, y_start, color);
+    textout_ex(buffer, font, label,
+               LEGEND_X + SPACING, y_start, LABEL_COLOR, BKG_COLOR);
+}
+
+void draw_legends(BITMAP *buffer)
+{
+
+    draw_legend_label(buffer, 0, GOAL_COLOR, ": GOAL");
+
+    draw_legend_label(buffer, 1, WALL_COLOR, ": WALL");
+
+    draw_legend_label(buffer, 2, ATTACKER_COLOR, ": ATK MISSILE");
+
+    draw_legend_label(buffer, 3, DEFENDER_COLOR, ": DEF MISSILE");
+}
+
 void draw_labels(BITMAP *buffer, int atk_p, int def_p)
 {
     char s[LABEL_LEN];
 
-    sprintf(s, "Attack points: %i\nDefender points: %i\n", atk_p, def_p);
-    textout_ex(buffer, font, s, LABEL_X, LABEL_Y, LABEL_COLOR, BKG_COLOR);
+    sprintf(s, "Attack points: %i", atk_p);
+    textout_ex(buffer, font, s, LABEL_X,
+               get_y_label(1), LABEL_COLOR, BKG_COLOR);
+
+    sprintf(s, "Defender points: %i", def_p);
+    textout_ex(buffer, font, s, LABEL_X,
+               get_y_label(2), LABEL_COLOR, BKG_COLOR);
+
+    draw_legends(buffer);
 }

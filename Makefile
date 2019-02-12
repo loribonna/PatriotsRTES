@@ -48,7 +48,7 @@ compile: $(SOURCE_WILDCARD_FILTERED)
 		$(CC) -g -c $f -o $(OUT_BUILD)/$(basename $(notdir $f)).o $(CFLAGS);)
 
 link: $(BUILD_OUTPUT_FILES)
-	$(CC) $(DEBUG) -DNDEBUG -o $(OUT_BUILD)/$(MAIN) $^ $(LIBS) $(CFLAGS)
+	$(CC) -o $(OUT_BUILD)/$(MAIN) $^ $(LIBS) $(CFLAGS)
 
 # ---------------------
 # SECTION: TEST
