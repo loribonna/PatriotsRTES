@@ -8,7 +8,7 @@
 #include <allegro.h>
 
 #define WALL_THICKNESS 2
-#define GOAL_START_Y (YWIN - YWIN * 0.8)
+#define GOAL_START_Y (YWIN * 0.8)
 #define EMPTY_CELL -1
 #define OTHER_CELL -2
 
@@ -34,9 +34,11 @@ typedef struct
     sem_t mutex;
 } env_t;
 
+extern env_t env;
+
 int check_missile_collisions(missile_t *missile);
 
-int update_missile_position(int oldx, int oldy, missile_t *missile);
+int update_missile_position(missile_t *missile, float deltatime);
 
 void draw_env(BITMAP *buffer);
 

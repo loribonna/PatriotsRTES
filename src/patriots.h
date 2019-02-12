@@ -8,6 +8,8 @@
 #include "ptask.h"
 #include <assert.h>
 
+#include "fifo-queue.h"
 #include "display.h"
+#include "attacker/atk-launcher.h"
 
 #endif

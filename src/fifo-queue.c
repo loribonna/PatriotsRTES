@@ -20,6 +20,18 @@ void init_queue(fifo_queue_gestor_t *gestor)
     gestor->full_sem.c = 0;
 }
 
+int is_queue_full(fifo_queue_gestor_t *gestor) {
+    int ret;
+
+    sem_wait(&(gestor->mutex_insert));
+
+    ret = gestor->freeIndex == -1;
+
+    sem_post(&(gestor->mutex_insert));
+
+    return ret;
+}
+
 int get_next_empty_item(fifo_queue_gestor_t *gestor)
 {
     int index;

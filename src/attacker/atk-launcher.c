@@ -1,16 +1,10 @@
 #include "atk-launcher.h"
 
-struct
-{
-    missile_t queue[N];
-    fifo_queue_gestor_t gestor;
-} atk_gestor;
+atk_gestor_t atk_gestor;
 
-void init_atk_missile(missile_t *missile, int index)
+void init_atk_launcher()
 {
-    init_missile(missile);
-    missile->missile_type = ATTACKER;
-    set_random_start(missile);
+    init_queue(&atk_gestor.gestor);
 }
 
 void atk_wait()
@@ -19,59 +13,67 @@ void atk_wait()
     t.tv_sec = 0;
     t.tv_nsec = ATK_SLEEP_DELAY;
     nanosleep(&t, NULL);
+    fprintf(stderr, "WAKEN\n");
 }
 
 void set_random_start(missile_t *missile)
 {
     missile->x = rand() % XWIN;
-    missile->y = 0;
+    missile->y = WALL_THICKNESS + MISSILE_RADIUS + 1;
 
-    missile->speed = rand() % MAX_SPEED;
-    missile->angle = frand(-MAX_ANGLE, MAX_ANGLE);
+    missile->speed = frand(1, MAX_SPEED);
+    missile->angle = frand(MAX_ANGLE, 180 - MAX_ANGLE);
 }
 
-// BLOCKING if the queue is full
-void launch_atk_missile()
+void init_atk_missile(missile_t *missile, int index)
+{
+    init_missile(missile);
+    missile->index = index;
+    missile->missile_type = ATTACKER;
+    set_random_start(missile);
+}
+
+void launch_atk_missile(int index)
 {
     missile_t *missile;
-    int index, thread;
-
-    index = get_next_empty_item(&atk_gestor.gestor);
+    int thread;
 
     missile = &(atk_gestor.queue[index]);
     init_atk_missile(missile, index);
 
     thread = launch_atk_thread(missile);
     assert(thread >= 0);
-
-    add_full_item(&atk_gestor.gestor, index);
 }
 
-void *atk_launcher(void *arg)
+ptask atk_launcher()
 {
-    int key;
+    int index;
 
-    do
+    while (1)
     {
-        key = 0;
-        if (keypressed())
-        {
-            key = readkey() >> 8;
+        index = get_next_full_item(&atk_gestor.gestor);
+        fprintf(stderr, "Launching ATK missile index: %i\n", index);
+        launch_atk_missile(index);
+        atk_wait();
+    }
+}
 
-            if (key == KEY_SPACE)
-            {
-                launch_atk_missile();
-                atk_wait();
-            }
-        }
-        ptask_wait_for_period();
+void launch_atk_launcher()
+{
+    int task;
 
-    } while (key != KEY_ESC);
+    task = ptask_create_prio(atk_launcher,
+                             ATK_LAUNCHER_PERIOD,
+                             ATK_LAUNCHER_PRIO,
+                             NOW);
 
-    return 0;
+    assert(task >= 0);
+
+    fprintf(stderr, "Created ATK launcher\n");
 }
 
 void delete_atk_missile(int index)
 {
     delete_missile(&(atk_gestor.queue[index]));
+    splice_full_item(&atk_gestor.gestor, index);
 }

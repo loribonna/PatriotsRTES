@@ -1,6 +1,7 @@
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
+#include <assert.h>
 #include <allegro.h>
 #include "ptask.h"
 #include <semaphore.h>
@@ -18,9 +19,16 @@
 #define GOAL_COLOR 10
 #define LABEL_COLOR 14
 
-#define LABEL_LEN 20
-#define LABEL_X (XWIN * 0.1)
-#define LABEL_Y (YWIN * 0.2)
+#define LABEL_LEN 30
+#define RECT_H 8
+#define RECT_W ((int)(((float)RECT_H/(float)YWIN)*(float)XWIN))
+#define LEGEND_X (XWIN - 120)
+#define LEGEND_Y 10
+#define LABEL_Y 10
+#define LABEL_X 10
+#define SPACING 2
+
+#define get_y_label(s) (YWIN - s * LABEL_Y)
 
 #define DISPLAY_PERIOD 10
 #define DISPLAY_PRIO 5
@@ -33,7 +41,7 @@ typedef struct {
 
 void display_init();
 
-int launch_display_manager();
+void launch_display_manager();
 
 int check_borders(int x, int y);
 
