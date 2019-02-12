@@ -4,9 +4,13 @@
 
 atk_gestor_t atk_gestor;
 
-//TODO
+static void init_atk_launcher()
+{
+    init_queue(&atk_gestor.gestor);
+}
+
 void init_launchers() {
-    
+    init_atk_launcher();
 }
 
 void init_queue(fifo_queue_gestor_t *gestor)
@@ -238,11 +242,6 @@ int launch_atk_thread(missile_t *missile)
     init_params(&params, missile);
 
     return ptask_create_param(atk_thread, &params);
-}
-
-void init_atk_launcher()
-{
-    init_queue(&atk_gestor.gestor);
 }
 
 void atk_wait()

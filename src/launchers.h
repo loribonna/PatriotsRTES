@@ -85,8 +85,6 @@ void move_missile(missile_t *missile, float deltatime);
 
 int launch_atk_thread(missile_t* missile);
 
-void init_atk_launcher();
-
 void delete_atk_missile(int index);
 
 void atk_missile_goal(int task);

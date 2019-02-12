@@ -5,9 +5,9 @@
 
 void init()
 {
-    display_init();
+    init_gestor();
 
-    init_env();
+    init_launchers();
 
     ptask_init(SCHED_FIFO, 1, 2);
 }
@@ -15,8 +15,6 @@ void init()
 void spawn_tasks()
 {
     launch_display_manager();
-
-    init_atk_launcher();
 
     launch_atk_launcher();
 }

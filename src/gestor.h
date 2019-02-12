@@ -71,6 +71,8 @@ typedef struct
 
 extern env_t env;
 
+void init_gestor();
+
 float frand(float min, float max);
 
 int get_euclidean_distance(float xa, float xb, float ya, float yb);
@@ -82,10 +84,6 @@ int check_missile_collisions(missile_t *missile);
 int update_missile_position(missile_t *missile, float deltatime);
 
 void draw_env(BITMAP *buffer);
-
-void init_env();
-
-void display_init();
 
 void launch_display_manager();
 

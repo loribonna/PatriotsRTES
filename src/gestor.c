@@ -8,6 +8,97 @@ BITMAP *buffer;
 score_t score;
 env_t env;
 
+/**
+ * INITIALZATIONS
+ */
+
+static int goal_init_check(int x, int y)
+{
+    return y > GOAL_START_Y;
+}
+
+static int wall_init_check(int x, int y)
+{
+    return x < WALL_THICKNESS ||
+           y < WALL_THICKNESS ||
+           XWIN - x < WALL_THICKNESS ||
+           YWIN - y < WALL_THICKNESS;
+}
+
+static void reset_buffer()
+{
+    clear_to_color(buffer, BKG_COLOR);
+}
+
+static void init_cell_empty(cell_t *cell)
+{
+    cell->type = EMPTY;
+    cell->value = EMPTY_CELL;
+}
+
+static void init_wall_cell(cell_t *cell)
+{
+    cell->type = WALL;
+    cell->value = OTHER_CELL;
+}
+
+static void init_goal_cell(cell_t *cell)
+{
+    cell->type = GOAL;
+    cell->value = OTHER_CELL;
+}
+
+static void init_cell(int x, int y)
+{
+    if (wall_init_check(x, y))
+    {
+        init_wall_cell(&(env.cell[x][y]));
+    }
+    else if (goal_init_check(x, y))
+    {
+        init_goal_cell(&(env.cell[x][y]));
+    }
+    else
+    {
+        init_cell_empty(&(env.cell[x][y]));
+    }
+}
+
+static void display_init()
+{
+    allegro_init();
+    set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
+    clear_to_color(screen, 0);
+    install_keyboard();
+
+    buffer = create_bitmap(XWIN, YWIN);
+    reset_buffer();
+}
+
+static void init_env()
+{
+    int x, y;
+
+    env.atk_points = env.def_points = 0;
+
+    for (x = 0; x < XWIN; x++)
+    {
+        for (y = 0; y < YWIN; y++)
+        {
+            init_cell(x, y);
+        }
+    }
+
+    sem_init(&env.mutex, 0, 1);
+}
+
+void init_gestor()
+{
+    display_init();
+    init_env();
+}
+
+
 float frand(float min, float max)
 {
     float r;
@@ -24,71 +115,6 @@ int get_euclidean_distance(float xa, float xb, float ya, float yb)
 float get_deltatime(int task_index, int unit)
 {
     return (float)ptask_get_period(task_index, unit) / DELTA_FACTOR;
-}
-
-
-void init_cell_empty(cell_t *cell)
-{
-    cell->type = EMPTY;
-    cell->value = EMPTY_CELL;
-}
-
-void init_wall_cell(cell_t *cell)
-{
-    cell->type = WALL;
-    cell->value = OTHER_CELL;
-}
-
-void init_goal_cell(cell_t *cell)
-{
-    cell->type = GOAL;
-    cell->value = OTHER_CELL;
-}
-
-int wall_init_check(int x, int y)
-{
-    return x < WALL_THICKNESS ||
-           y < WALL_THICKNESS ||
-           XWIN - x < WALL_THICKNESS ||
-           YWIN - y < WALL_THICKNESS;
-}
-
-int goal_init_check(int x, int y)
-{
-    return y > GOAL_START_Y;
-}
-
-void init_cell(int x, int y)
-{
-    if (wall_init_check(x, y))
-    {
-        init_wall_cell(&(env.cell[x][y]));
-    }
-    else if (goal_init_check(x, y))
-    {
-        init_goal_cell(&(env.cell[x][y]));
-    }
-    else
-    {
-        init_cell_empty(&(env.cell[x][y]));
-    }
-}
-
-void init_env()
-{
-    int x, y;
-
-    env.atk_points = env.def_points = 0;
-
-    for (x = 0; x < XWIN; x++)
-    {
-        for (y = 0; y < YWIN; y++)
-        {
-            init_cell(x, y);
-        }
-    }
-
-    sem_init(&env.mutex, 0, 1);
 }
 
 int is_empty_cell(cell_t *cell)
@@ -292,22 +318,6 @@ void draw_env(BITMAP *buffer)
     draw_labels(buffer, env.atk_points, env.def_points);
 
     sem_post(&env.mutex);
-}
-
-void reset_buffer()
-{
-    clear_to_color(buffer, BKG_COLOR);
-}
-
-void display_init()
-{
-    allegro_init();
-    set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
-    clear_to_color(screen, 0);
-    install_keyboard();
-
-    buffer = create_bitmap(XWIN, YWIN);
-    reset_buffer();
 }
 
 int check_borders(int x, int y)
