@@ -210,12 +210,6 @@ void move_missile(missile_t *missile, float deltatime)
     missile->y += dy * deltatime;
 }
 
-static void print_missile(missile_t *missile)
-{
-    fprintf(stderr, "i: %i, x: %f, y: %f, angle: %f\n",
-            missile->index, missile->x, missile->y, missile->angle);
-}
-
 static void init_params(tpars *params, void *arg)
 {
     ptask_param_init(*params);
