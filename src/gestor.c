@@ -27,7 +27,11 @@ static int wall_init_check(int x, int y)
 
 static void reset_buffer()
 {
+    sem_wait(&env.mutex);
+
     clear_to_color(buffer, BKG_COLOR);
+
+    sem_post(&env.mutex);
 }
 
 static void init_cell_empty(cell_t *cell)
@@ -72,7 +76,6 @@ static void display_init()
     install_keyboard();
 
     buffer = create_bitmap(XWIN, YWIN);
-    reset_buffer();
 }
 
 static void init_env()
@@ -94,8 +97,8 @@ static void init_env()
 
 void init_gestor()
 {
-    display_init();
     init_env();
+    display_init();
 }
 
 /**
@@ -126,6 +129,15 @@ float get_deltatime(int task_index, int unit)
 /**
  * CELLS CHECK
  */
+
+void clear_cell(int x, int y)
+{
+    sem_wait(&env.mutex);
+
+    init_cell_empty(&(env.cell[x][y]));
+
+    sem_post(&env.mutex);
+}
 
 static int is_empty_cell(cell_t *cell)
 {
@@ -167,13 +179,13 @@ static void atk_point()
     env.atk_points++;
 }
 
-static int handle_collision_by_cell_type(cell_t *cell)
+static cell_type handle_collision_by_cell_type(cell_t *cell)
 {
-    int collided;
+    cell_type type;
 
-    collided = 1;
+    type = cell->type;
 
-    switch (cell->type)
+    switch (type)
     {
     case WALL:
         break;
@@ -188,34 +200,54 @@ static int handle_collision_by_cell_type(cell_t *cell)
         init_cell_empty(cell);
         break;
     default:
-        collided = 0;
         break;
     }
 
-    return collided;
+    return type;
 }
 
 static int handle_collision(missile_type_t missile_type, cell_t *cell)
 {
-    int collided;
+    cell_type type;
 
-    collided = handle_collision_by_cell_type(cell);
+    type = handle_collision_by_cell_type(cell);
 
-    if (collided)
+    if (type != EMPTY)
     {
         if (
-            (missile_type == ATTACKER && cell->type == DEF_MISSILE) ||
-            (missile_type == DEFENDER && cell->type == ATK_MISSILE))
+            (missile_type == ATTACKER && type == DEF_MISSILE) ||
+            (missile_type == DEFENDER && type == ATK_MISSILE))
         {
             def_point();
         }
-        if (missile_type == ATTACKER && cell->type == GOAL)
+        if (missile_type == ATTACKER && type == GOAL)
         {
             atk_point();
         }
+
+        return 1;
     }
 
-    return collided;
+    return 0;
+}
+
+static void print_env()
+{
+    int x, y;
+
+    for (y = 0; y < YWIN; y++)
+    {
+        for (x = 0; x < XWIN; x++)
+        {
+            if (!is_empty_cell(&env.cell[x][y]) &&
+                !is_wall_cell(&env.cell[x][y]) &&
+                !is_goal_cell(&env.cell[x][y]))
+            {
+                fprintf(stderr, "%i (%i %i) ", env.cell[x][y].value, x, y);
+            }
+        }
+    }
+    fprintf(stderr, "\n");
 }
 
 static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
@@ -230,9 +262,10 @@ static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
         for (y = ya; y < yb; y++)
         {
             if (env.cell[x][y].value != missile->index &&
-                env.cell[x][y].type != EMPTY &&
+                !is_empty_cell(&(env.cell[x][y])) &&
                 handle_collision(missile_type, &(env.cell[x][y])))
             {
+                print_env();
                 return 1;
             }
         }
@@ -258,108 +291,60 @@ static int handle_collisions_around_missile(missile_t *missile, int span)
     return collision_around(xa, ya, xb, yb, missile);
 }
 
-static void update_cell_value(int x, int y, int value, cell_type type)
+static void update_missile_cell(missile_t *missile)
 {
-    env.cell[x][y].value = value;
+    int x, y;
+    cell_type type;
+
+    x = missile->x;
+    y = missile->y;
+    type = missile->missile_type == ATTACKER ? ATK_MISSILE : DEF_MISSILE;
+
+    env.cell[x][y].value = missile->index;
     env.cell[x][y].type = type;
 }
 
-int update_missile_position(missile_t *missile, float deltatime)
+int update_missile_position(missile_t *missile, int oldx, int oldy)
 {
-    int newx, newy, oldx, oldy, type, collisions;
-
-    oldx = (int)missile->x;
-    oldy = (int)missile->y;
-    type = missile->missile_type == ATTACKER ? ATK_MISSILE : DEF_MISSILE;
+    int collided;
 
     sem_wait(&env.mutex);
 
-    move_missile(missile, deltatime);
-
-    newx = (int)missile->x;
-    newy = (int)missile->y;
-
     init_cell_empty(&(env.cell[oldx][oldy]));
 
-    collisions = handle_collisions_around_missile(missile, MISSILE_RADIUS);
+    collided = handle_collisions_around_missile(missile, MISSILE_RADIUS);
 
-    if (!collisions)
+    if (!collided)
     {
-        update_cell_value(newx, newy, missile->index, type);
+        update_missile_cell(missile);
     }
 
     sem_post(&env.mutex);
 
-    return collisions;
+    return collided;
+}
+
+int update_missile_env(missile_t *missile, int oldx, int oldy)
+{
+    int collided;
+
+    sem_wait(&missile->mutex);
+
+    if (missile->deleted)
+    {
+        sem_post(&missile->mutex);
+        return 1;
+    }
+
+    collided = update_missile_position(missile, oldx, oldy);
+    sem_post(&missile->mutex);
+
+    return collided;
 }
 
 /**
  * ENVIRONMENT DRAW
  */
-
-static void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
-{
-    missile_type_t m_type;
-
-    if (is_missile_cell(cell))
-    {
-        m_type = cell->type == ATK_MISSILE ? ATTACKER : DEFENDER;
-        draw_missile(buffer, x, y, m_type);
-    }
-    else if (is_wall_cell(cell))
-    {
-        draw_wall(x, y, buffer);
-    }
-    else if (is_goal_cell(cell))
-    {
-        draw_goal(x, y, buffer);
-    }
-}
-
-void draw_env(BITMAP *buffer)
-{
-    int x, y;
-
-    sem_wait(&env.mutex);
-
-    for (x = 0; x < XWIN; x++)
-    {
-        for (y = 0; y < YWIN; y++)
-        {
-            if (!is_empty_cell(&(env.cell[x][y])))
-            {
-                draw_cell(&(env.cell[x][y]), x, y, buffer);
-            }
-        }
-    }
-
-    draw_labels(buffer, env.atk_points, env.def_points);
-
-    sem_post(&env.mutex);
-}
-
-/**
- * SCREEN DRAW
- */
-
-static void draw_buffer_to_screen()
-{
-    sem_wait(&env.mutex);
-
-    blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
-
-    sem_post(&env.mutex);
-}
-
-void draw_wall(int x, int y, BITMAP *buffer)
-{
-    putpixel(buffer, x, y, WALL_COLOR);
-}
-
-void draw_goal(int x, int y, BITMAP *buffer)
-{
-    putpixel(buffer, x, y, GOAL_COLOR);
-}
 
 static void draw_legend(BITMAP *buffer, int spaces, int color, char *label)
 {
@@ -385,7 +370,7 @@ static void draw_legends(BITMAP *buffer)
     draw_legend(buffer, 3, DEFENDER_COLOR, ": DEF MISSILE");
 }
 
-void draw_labels(BITMAP *buffer, int atk_p, int def_p)
+static void draw_labels(BITMAP *buffer, int atk_p, int def_p)
 {
     char s[LABEL_LEN];
 
@@ -403,6 +388,66 @@ void draw_labels(BITMAP *buffer, int atk_p, int def_p)
     draw_legends(buffer);
 }
 
+static void draw_wall(int x, int y, BITMAP *buffer)
+{
+    putpixel(buffer, x, y, WALL_COLOR);
+}
+
+static void draw_goal(int x, int y, BITMAP *buffer)
+{
+    putpixel(buffer, x, y, GOAL_COLOR);
+}
+
+static void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
+{
+    missile_type_t m_type;
+
+    if (is_missile_cell(cell))
+    {
+        m_type = cell->type == ATK_MISSILE ? ATTACKER : DEFENDER;
+        draw_missile(buffer, x, y, m_type);
+    }
+    else if (is_wall_cell(cell))
+    {
+        draw_wall(x, y, buffer);
+    }
+    else if (is_goal_cell(cell))
+    {
+        draw_goal(x, y, buffer);
+    }
+}
+
+void draw_env()
+{
+    int x, y;
+
+    sem_wait(&env.mutex);
+
+    for (x = 0; x < XWIN; x++)
+    {
+        for (y = 0; y < YWIN; y++)
+        {
+            if (!is_empty_cell(&(env.cell[x][y])))
+            {
+                draw_cell(&(env.cell[x][y]), x, y, buffer);
+            }
+        }
+    }
+
+    draw_labels(buffer, env.atk_points, env.def_points);
+
+    sem_post(&env.mutex);
+}
+
+static void draw_buffer_to_screen()
+{
+    sem_wait(&env.mutex);
+
+    blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
+
+    sem_post(&env.mutex);
+}
+
 /**
  * THREAD MANAGERS
  */
@@ -413,7 +458,7 @@ static ptask display_manager(void)
     {
         reset_buffer();
 
-        draw_env(buffer);
+        draw_env();
 
         draw_buffer_to_screen();
 

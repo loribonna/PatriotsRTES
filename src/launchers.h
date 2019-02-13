@@ -26,12 +26,16 @@ typedef enum
     ATTACKER,
     DEFENDER
 } missile_type_t;
+
 typedef struct
 {
-    float x, y;
+    int x, y;
+    float partial_x, partial_y;
     float angle, speed;
     int index;
-    sem_t deleted;
+    int deleted;
+    int cleared;
+    sem_t mutex;
     missile_type_t missile_type;
 } missile_t;
 
@@ -45,12 +49,13 @@ typedef struct
 {
     int freeIndex, tailIndex, headIndex;
     int next[N];
-    sem_t mutex_insert, mutex_remove;
-    struct private_sem_t empty_sem;
-    struct private_sem_t full_sem;
+    sem_t mutex;
+    struct private_sem_t write_sem;
+    struct private_sem_t read_sem;
 } fifo_queue_gestor_t;
 
-typedef struct {
+typedef struct
+{
     missile_t queue[N];
     fifo_queue_gestor_t gestor;
 } atk_gestor_t;
@@ -59,15 +64,9 @@ extern atk_gestor_t atk_gestor;
 
 void init_launchers();
 
-int is_queue_full(fifo_queue_gestor_t *gestor);
-
-int get_next_empty_item(fifo_queue_gestor_t *gestor);
-
-void add_full_item(fifo_queue_gestor_t *gestor, int index);
+void request_atk_launch(fifo_queue_gestor_t *gestor);
 
 int draw_missile(BITMAP *buffer, int x, int y, missile_type_t type);
-
-void move_missile(missile_t *missile, float deltatime);
 
 void delete_atk_missile(int index);
 

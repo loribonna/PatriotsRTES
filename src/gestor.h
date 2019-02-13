@@ -69,28 +69,20 @@ typedef struct
     sem_t mutex;
 } env_t;
 
-extern env_t env;
-
 void init_gestor();
 
 float frand(float min, float max);
 
 float get_deltatime(int task_index, int unit);
 
+void clear_cell(int x, int y);
+
 int check_missile_collisions(missile_t *missile);
 
-int update_missile_position(missile_t *missile, float deltatime);
-
-void draw_env(BITMAP *buffer);
+int update_missile_env(missile_t *missile, int oldx, int oldy);
 
 void launch_display_manager();
 
 int check_borders(int x, int y);
-
-void draw_wall(int x, int y, BITMAP *buffer);
-
-void draw_goal(int x, int y, BITMAP *buffer);
-
-void draw_labels(BITMAP *buffer, int atk_p, int def_p);
 
 #endif

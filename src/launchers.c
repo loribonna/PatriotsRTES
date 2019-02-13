@@ -10,22 +10,23 @@ atk_gestor_t atk_gestor;
 
 static void init_queue(fifo_queue_gestor_t *gestor)
 {
+    int i;
+
     gestor->freeIndex = 0;
-    gestor->tailIndex = -1;
-    gestor->headIndex = -1;
-    for (int i = 0; i < N - 1; i++)
+    gestor->headIndex = gestor->tailIndex = -1;
+    for (i = 0; i < N - 1; i++)
     {
         gestor->next[i] = i + 1;
     }
     gestor->next[N - 1] = -1;
 
-    sem_init(&(gestor->mutex_insert), 0, 1);
-    sem_init(&(gestor->mutex_remove), 0, 1);
+    sem_init(&(gestor->mutex), 0, 1);
 
-    sem_init(&(gestor->empty_sem).s, 0, 0);
-    sem_init(&(gestor->full_sem).s, 0, 0);
-    gestor->empty_sem.c = 0;
-    gestor->full_sem.c = 0;
+    sem_init(&(gestor->read_sem).s, 0, 0);
+    gestor->read_sem.c = 0;
+
+    sem_init(&(gestor->write_sem.s), 0, 0);
+    gestor->write_sem.c = 0;
 }
 
 static void init_atk_launcher()
@@ -33,7 +34,8 @@ static void init_atk_launcher()
     init_queue(&atk_gestor.gestor);
 }
 
-void init_launchers() {
+void init_launchers()
+{
     init_atk_launcher();
 }
 
@@ -41,51 +43,12 @@ void init_launchers() {
  * QUEUE MANAGEMENT
  */
 
-int is_queue_full(fifo_queue_gestor_t *gestor)
+void update_queue_head(fifo_queue_gestor_t *gestor, int index)
 {
-    int ret;
-
-    sem_wait(&(gestor->mutex_insert));
-
-    ret = gestor->freeIndex == -1;
-
-    sem_post(&(gestor->mutex_insert));
-
-    return ret;
-}
-
-int get_next_empty_item(fifo_queue_gestor_t *gestor)
-{
-    int index;
-
-    sem_wait(&(gestor->mutex_insert));
-
-    if (gestor->empty_sem.c || gestor->freeIndex == -1)
-    {
-        gestor->empty_sem.c++;
-        sem_post(&(gestor->mutex_insert));
-        sem_wait(&(gestor->empty_sem).s);
-        gestor->empty_sem.c--;
-    }
-
-    assert(gestor->freeIndex >= 0);
-
-    index = gestor->freeIndex;
-    gestor->freeIndex = gestor->next[gestor->freeIndex];
-
-    sem_post(&(gestor->mutex_insert));
-
-    return index;
-}
-
-void add_full_item(fifo_queue_gestor_t *gestor, int index)
-{
-    sem_wait(&(gestor->mutex_remove));
-
-    assert(index >= 0);
+    assert(index >= 0 && gestor->read_sem.c > 0);
 
     gestor->next[index] = -1;
-    if (gestor->headIndex < 0)
+    if (gestor->headIndex == -1)
     {
         gestor->headIndex = index;
     }
@@ -94,29 +57,40 @@ void add_full_item(fifo_queue_gestor_t *gestor, int index)
         gestor->next[gestor->tailIndex] = index;
     }
     gestor->tailIndex = index;
-
-    if (gestor->full_sem.c)
-    {
-        sem_post(&(gestor->full_sem).s);
-    }
-    else
-    {
-        sem_post(&(gestor->mutex_remove));
-    }
 }
 
-static int get_next_full_item(fifo_queue_gestor_t *gestor)
+void request_atk_launch(fifo_queue_gestor_t *gestor)
 {
     int index;
 
-    sem_wait(&(gestor->mutex_remove));
+    sem_wait(&(gestor->mutex));
+
+    if (gestor->freeIndex == -1 || !gestor->read_sem.c)
+    {
+        index = -1;
+        sem_post(&(gestor->mutex));
+    }
+    else
+    {
+        index = gestor->freeIndex;
+        gestor->freeIndex = gestor->next[gestor->freeIndex];
+        update_queue_head(gestor, index);
+        sem_post(&(gestor->read_sem).s);
+    }
+}
+
+static int get_next_index(fifo_queue_gestor_t *gestor)
+{
+    int index;
+
+    sem_wait(&(gestor->mutex));
 
     if (gestor->headIndex == -1)
     {
-        gestor->full_sem.c++;
-        sem_post(&(gestor->mutex_remove));
-        sem_wait(&gestor->full_sem.s);
-        gestor->full_sem.c--;
+        gestor->read_sem.c++;
+        sem_post(&(gestor->mutex));
+        sem_wait(&(gestor->read_sem.s));
+        gestor->read_sem.c--;
     }
 
     assert(gestor->headIndex >= 0);
@@ -124,41 +98,26 @@ static int get_next_full_item(fifo_queue_gestor_t *gestor)
     index = gestor->headIndex;
     gestor->headIndex = gestor->next[gestor->headIndex];
 
-    sem_post(&(gestor->mutex_remove));
+    sem_post(&(gestor->mutex));
 
     return index;
 }
 
-static void splice_full_item(fifo_queue_gestor_t *gestor, int index)
+static void splice_index(fifo_queue_gestor_t *gestor, int index)
 {
-    sem_wait(&(gestor->mutex_insert));
+    sem_wait(&(gestor->mutex));
 
     assert(index >= 0);
 
     gestor->next[index] = gestor->freeIndex;
     gestor->freeIndex = index;
 
-    if (gestor->empty_sem.c)
-    {
-        sem_post(&(gestor->empty_sem).s);
-    }
-    else
-    {
-        sem_post(&(gestor->mutex_insert));
-    }
+    sem_post(&(gestor->mutex));
 }
 
 /**
  * MISSILE FUNCTIONS
  */
-
-static void init_missile(missile_t *missile)
-{
-    sem_init(&missile->deleted, 0, 0);
-    missile->speed = missile->angle = 0;
-    missile->x = missile->y = 0;
-    missile->index = -1;
-}
 
 int draw_missile(BITMAP *buffer, int x, int y, missile_type_t type)
 {
@@ -183,31 +142,43 @@ int draw_missile(BITMAP *buffer, int x, int y, missile_type_t type)
     return 0;
 }
 
-static void delete_missile(missile_t *missile)
+static int is_deleted_missile(missile_t *missile)
 {
-    sem_post(&missile->deleted);
+    int deleted;
+
+    sem_wait(&missile->mutex);
+
+    deleted = missile->deleted;
+
+    sem_post(&missile->mutex);
+
+    return deleted;
 }
 
-static int is_deleted(missile_t *missile)
-{
-    int sval;
-
-    sem_getvalue(&missile->deleted, &sval);
-
-    return sval;
-}
-
-void move_missile(missile_t *missile, float deltatime)
+static void move_missile(missile_t *missile, float deltatime)
 {
     float dx, dy, angle_rad;
+
+    sem_wait(&missile->mutex);
+
+    if (missile->deleted)
+    {
+        sem_post(&missile->mutex);
+        return;
+    }
 
     angle_rad = missile->angle * (M_PI / 180);
 
     dx = missile->speed * cos(angle_rad);
     dy = missile->speed * sin(angle_rad);
 
-    missile->x += dx * deltatime;
-    missile->y += dy * deltatime;
+    missile->partial_x += dx * deltatime;
+    missile->partial_y += dy * deltatime;
+
+    missile->x = (int)missile->partial_x;
+    missile->y = (int)missile->partial_y;
+
+    sem_post(&missile->mutex);
 }
 
 static void init_params(tpars *params, void *arg)
@@ -223,26 +194,48 @@ static void init_params(tpars *params, void *arg)
  * ATTACK THREADS
  */
 
+void clear_atk_missile(missile_t *missile)
+{
+    sem_wait(&missile->mutex);
+
+    if (!missile->cleared)
+    {
+        fprintf(stderr, "DELETING Missile %i\n", missile->index);
+
+        missile->cleared = 1;
+        missile->speed = 0;
+
+        splice_index(&atk_gestor.gestor, missile->index);
+    }
+
+    sem_post(&missile->mutex);
+}
+
 ptask atk_thread(void)
 {
     missile_t *self;
-    float task_index, deltatime, collided;
+    float task_index, deltatime, collided, oldx, oldy;
 
     collided = 0;
     task_index = ptask_get_index();
     deltatime = get_deltatime(task_index, MILLI);
     self = ptask_get_argument();
 
-    fprintf(stderr, "ATK missile %i: position %f %f\n", self->index, self->x, self->y);
+    fprintf(stderr, "ATK missile %i: position %i %i\n",
+            self->index, self->x, self->y);
 
-    while (!is_deleted(self) && !collided)
+    while (!is_deleted_missile(self) && !collided)
     {
-        collided = update_missile_position(self, deltatime);
+        oldx = self->x;
+        oldy = self->y;
+        move_missile(self, deltatime);
+
+        collided = update_missile_env(self, oldx, oldy);
 
         ptask_wait_for_period();
     }
 
-    delete_atk_missile(self->index);
+    clear_atk_missile(self);
 }
 
 static int launch_atk_thread(missile_t *missile)
@@ -265,16 +258,28 @@ static void atk_wait()
 
 static void set_random_start(missile_t *missile)
 {
-    missile->x = rand() % XWIN;
-    missile->y = WALL_THICKNESS + MISSILE_RADIUS + 1;
+    missile->partial_x = 100; // rand() % XWIN;
+    missile->partial_y = WALL_THICKNESS + MISSILE_RADIUS + 1;
 
     missile->speed = frand(1, MAX_SPEED);
-    missile->angle = frand(MAX_ANGLE, 180 - MAX_ANGLE);
+    missile->angle = 90; //frand(MAX_ANGLE, 180 - MAX_ANGLE);
+
+    missile->x = (int)missile->partial_x;
+    missile->y = (int)missile->partial_y;
+}
+
+static void init_empty_missile(missile_t *missile)
+{
+    sem_init(&missile->mutex, 0, 1);
+    missile->deleted = missile->cleared = 0;
+    missile->speed = missile->angle = 0;
+    missile->x = missile->y = 0;
+    missile->index = -1;
 }
 
 static void init_atk_missile(missile_t *missile, int index)
 {
-    init_missile(missile);
+    init_empty_missile(missile);
     missile->index = index;
     missile->missile_type = ATTACKER;
     set_random_start(missile);
@@ -298,7 +303,7 @@ ptask atk_launcher()
 
     while (1)
     {
-        index = get_next_full_item(&atk_gestor.gestor);
+        index = get_next_index(&atk_gestor.gestor);
         fprintf(stderr, "Launching ATK missile index: %i\n", index);
         launch_atk_missile(index);
         atk_wait();
@@ -321,11 +326,13 @@ void launch_atk_launcher()
 
 void delete_atk_missile(int index)
 {
-    delete_missile(&(atk_gestor.queue[index]));
-    splice_full_item(&atk_gestor.gestor, index);
+    missile_t *missile;
+
+    missile = &(atk_gestor.queue[index]);
+    missile->deleted = 1;
 }
 
 //TODO
-void delete_def_missile(int index) {
-
+void delete_def_missile(int index)
+{
 }

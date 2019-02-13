@@ -21,7 +21,7 @@ void spawn_tasks()
 
 int main(void)
 {
-    int c, k, index;
+    int c, k;
 
     init();
 
@@ -34,10 +34,9 @@ int main(void)
         {
             c = readkey();
             k = c >> 8;
-            if (k == KEY_SPACE && !is_queue_full(&atk_gestor.gestor))
+            if (k == KEY_SPACE)
             {
-                index = get_next_empty_item(&atk_gestor.gestor);
-                add_full_item(&atk_gestor.gestor, index);
+                request_atk_launch(&atk_gestor.gestor);
             }
         }
 
