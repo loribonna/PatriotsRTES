@@ -231,25 +231,6 @@ static int handle_collision(missile_type_t missile_type, cell_t *cell)
     return 0;
 }
 
-static void print_env()
-{
-    int x, y;
-
-    for (y = 0; y < YWIN; y++)
-    {
-        for (x = 0; x < XWIN; x++)
-        {
-            if (!is_empty_cell(&env.cell[x][y]) &&
-                !is_wall_cell(&env.cell[x][y]) &&
-                !is_goal_cell(&env.cell[x][y]))
-            {
-                fprintf(stderr, "%i (%i %i) ", env.cell[x][y].value, x, y);
-            }
-        }
-    }
-    fprintf(stderr, "\n");
-}
-
 static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
 {
     int x, y;
@@ -265,7 +246,6 @@ static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
                 !is_empty_cell(&(env.cell[x][y])) &&
                 handle_collision(missile_type, &(env.cell[x][y])))
             {
-                print_env();
                 return 1;
             }
         }

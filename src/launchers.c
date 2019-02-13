@@ -200,7 +200,7 @@ void clear_atk_missile(missile_t *missile)
 
     if (!missile->cleared)
     {
-        fprintf(stderr, "DELETING Missile %i\n", missile->index);
+        fprintf(stderr, "Attack missile %i deleted\n", missile->index);
 
         missile->cleared = 1;
         missile->speed = 0;
@@ -221,7 +221,7 @@ ptask atk_thread(void)
     deltatime = get_deltatime(task_index, MILLI);
     self = ptask_get_argument();
 
-    fprintf(stderr, "ATK missile %i: position %i %i\n",
+    fprintf(stderr, "ATK missile launched (%i): position %i %i\n",
             self->index, self->x, self->y);
 
     while (!is_deleted_missile(self) && !collided)
@@ -253,16 +253,15 @@ static void atk_wait()
     t.tv_sec = 0;
     t.tv_nsec = ATK_SLEEP_DELAY;
     nanosleep(&t, NULL);
-    fprintf(stderr, "WAKEN\n");
 }
 
 static void set_random_start(missile_t *missile)
 {
-    missile->partial_x = 100; // rand() % XWIN;
+    missile->partial_x = rand() % XWIN;
     missile->partial_y = WALL_THICKNESS + MISSILE_RADIUS + 1;
 
     missile->speed = frand(1, MAX_SPEED);
-    missile->angle = 90; //frand(MAX_ANGLE, 180 - MAX_ANGLE);
+    missile->angle = frand(MAX_ANGLE, 180 - MAX_ANGLE);
 
     missile->x = (int)missile->partial_x;
     missile->y = (int)missile->partial_y;
@@ -304,7 +303,6 @@ ptask atk_launcher()
     while (1)
     {
         index = get_next_index(&atk_gestor.gestor);
-        fprintf(stderr, "Launching ATK missile index: %i\n", index);
         launch_atk_missile(index);
         atk_wait();
     }
