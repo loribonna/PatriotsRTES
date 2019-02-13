@@ -72,7 +72,7 @@ static void display_init()
 {
     allegro_init();
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
-    clear_to_color(screen, 0);
+    clear_to_color(screen, BKG_COLOR);
     install_keyboard();
 
     buffer = create_bitmap(XWIN, YWIN);
@@ -368,6 +368,29 @@ static void draw_labels(BITMAP *buffer, int atk_p, int def_p)
     draw_legends(buffer);
 }
 
+static void draw_missile(BITMAP *buffer, int x, int y, missile_type_t type)
+{
+    int color;
+
+    if (!check_borders(x, y))
+    {
+        return;
+    }
+
+    if (type == ATTACKER)
+    {
+        color = ATTACKER_COLOR;
+    }
+    else
+    {
+        color = DEFENDER_COLOR;
+    }
+
+    circlefill(buffer, x, y, MISSILE_RADIUS, color);
+
+    return;
+}
+
 static void draw_wall(int x, int y, BITMAP *buffer)
 {
     putpixel(buffer, x, y, WALL_COLOR);
@@ -429,8 +452,42 @@ static void draw_buffer_to_screen()
 }
 
 /**
- * THREAD MANAGERS
+ * DISPLAY THREAD
  */
+
+int check_pixel(int x, int y)
+{
+    if (getpixel(screen, x, y) == ATTACKER_COLOR)
+    {
+        return !is_already_tracked(env.cell[x][y].value);
+    }
+
+    return 0;
+}
+
+int search_screen_for_target()
+{
+    int x, y, target;
+
+    sem_wait(&env.mutex);
+
+    for (y = 0; y < YWIN; y++)
+    {
+        for (x = 0; x < XWIN; x++)
+        {
+            if (check_pixel(x, y))
+            {
+                target = env.cell[x][y].value;
+                sem_post(&env.mutex);
+                return target;
+            }
+        }
+    }
+
+    sem_post(&env.mutex);
+
+    return -1;
+}
 
 static ptask display_manager(void)
 {

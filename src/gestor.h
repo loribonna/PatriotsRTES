@@ -1,6 +1,7 @@
 #ifndef GESTOR_H
 #define GESTOR_H
 
+#include <stdlib.h>
 #include <allegro.h>
 #include <semaphore.h>
 #include "ptask.h"
@@ -23,6 +24,8 @@
 #define WALL_COLOR 6
 #define GOAL_COLOR 10
 #define LABEL_COLOR 14
+#define ATTACKER_COLOR 4
+#define DEFENDER_COLOR 11
 
 #define LABEL_LEN 30
 #define RECT_H 8
@@ -84,5 +87,7 @@ int update_missile_env(missile_t *missile, int oldx, int oldy);
 void launch_display_manager();
 
 int check_borders(int x, int y);
+
+int search_screen_for_target();
 
 #endif
