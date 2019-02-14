@@ -29,7 +29,7 @@
 
 #define LABEL_LEN 30
 #define RECT_H 8
-#define RECT_W ((int)(((float)RECT_H/(float)YWIN)*(float)XWIN))
+#define RECT_W ((int)(((float)RECT_H / (float)YWIN) * (float)XWIN))
 #define LEGEND_X (XWIN - 120)
 #define LEGEND_Y 10
 #define LABEL_Y 10
@@ -44,7 +44,8 @@
 #define M_PI 3.14159265358979323846
 #define DELTA_FACTOR 1000
 
-typedef struct {
+typedef struct
+{
     int atk_hit;
     int def_hit;
     sem_t mutex;
@@ -64,6 +65,12 @@ typedef struct
     cell_type type;
     int value;
 } cell_t;
+
+typedef struct
+{
+    int x;
+    int y;
+} pos_t;
 
 typedef struct
 {
@@ -89,5 +96,11 @@ void launch_display_manager();
 int check_borders(int x, int y);
 
 int search_screen_for_target();
+
+pos_t scan_env_for_target_pos(int target);
+
+void init_empty_pos(pos_t *pos);
+
+int is_valid_pos(pos_t *pos);
 
 #endif

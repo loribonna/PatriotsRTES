@@ -16,6 +16,7 @@ void spawn_tasks()
 {
     launch_display_manager();
 
+    launch_def_launcher();
     launch_atk_launcher();
 }
 

@@ -220,7 +220,7 @@ static void move_missile(missile_t *missile, float deltatime)
     sem_post(&missile->mutex);
 }
 
-static void init_params(tpars *params, void *arg)
+static void init_atk_params(tpars *params, void *arg)
 {
     ptask_param_init(*params);
     ptask_param_period((*params), ATK_MISSILE_PERIOD, MILLI);
@@ -244,6 +244,26 @@ void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
     sem_post(&missile->mutex);
 }
 
+static void task_missile_movement(missile_t *missile, int task_index)
+{
+    int oldx, oldy, collided;
+    float deltatime;
+
+    collided = 0;
+    deltatime = get_deltatime(task_index, MILLI);
+
+    while (!is_deleted_missile(missile) && !collided)
+    {
+        oldx = missile->x;
+        oldy = missile->y;
+        move_missile(missile, deltatime);
+
+        collided = update_missile_env(missile, oldx, oldy);
+
+        ptask_wait_for_period();
+    }
+}
+
 /**
  * ATTACK THREADS
  */
@@ -256,23 +276,12 @@ void clear_atk_missile(missile_t *missile)
 ptask atk_thread(void)
 {
     missile_t *self;
-    float task_index, deltatime, collided, oldx, oldy;
+    int task_index;
 
-    collided = 0;
     task_index = ptask_get_index();
-    deltatime = get_deltatime(task_index, MILLI);
     self = ptask_get_argument();
 
-    while (!is_deleted_missile(self) && !collided)
-    {
-        oldx = self->x;
-        oldy = self->y;
-        move_missile(self, deltatime);
-
-        collided = update_missile_env(self, oldx, oldy);
-
-        ptask_wait_for_period();
-    }
+    task_missile_movement(self, task_index);
 
     clear_atk_missile(self);
 }
@@ -281,7 +290,7 @@ static int launch_atk_thread(missile_t *missile)
 {
     tpars params;
 
-    init_params(&params, missile);
+    init_atk_params(&params, missile);
 
     return ptask_create_param(atk_thread, &params);
 }
@@ -365,6 +374,14 @@ void delete_atk_missile(int index)
  * DEFENDER THREADS
  */
 
+static void def_missile_wait()
+{
+    struct timespec t;
+    t.tv_sec = 0;
+    t.tv_nsec = DEF_MISSILE_DELAY;
+    nanosleep(&t, NULL);
+}
+
 static void def_wait()
 {
     struct timespec t;
@@ -396,16 +413,138 @@ void clear_def_missile(missile_t *missile)
     clear_missile(missile, &def_gestor.gestor);
 }
 
-static void set_trajectory(missile_t *missile, float angle, int x)
+static float get_pos_distance(pos_t *pos_a, pos_t *pos_b)
 {
-    missile->angle = angle;
-    missile->partial_x = missile->x = x;
-    missile->partial_y = missile->y = GOAL_START_Y - SPACING;
+    return sqrt(pow(pos_a->x - pos_b->x, 2) + pow(pos_a->y - pos_b->y, 2));
 }
 
-static int launch_def_thread(missile_t *missile) {
-    // TODO
-    return -1;
+static float get_line_m(pos_t *pos_a, pos_t *pos_b)
+{
+    if (pos_b->x == pos_a->x)
+    {
+        return 0;
+    }
+    return (pos_b->y - pos_a->y) / (pos_b->x - pos_a->x);
+}
+
+static float get_line_angle(pos_t *pos_a, pos_t *pos_b)
+{
+    return atan2((pos_b->y - pos_a->y), (pos_b->x - pos_a->x));
+}
+
+static float get_line_b_with_m(float m, pos_t *pos)
+{
+    return -m * pos->x + pos->y;
+}
+
+static float get_x_from_trajectory(trajectory_t *t, float y)
+{
+    return t->m != 0 ? (y - t->b) / t->m : 0;
+}
+
+static float get_expected_position_x(trajectory_t *t, pos_t *current)
+{
+    float dsa, end_y, dsb;
+
+    dsa = DS_AMOUNT(t->speed);
+
+    do
+    {
+        end_y = (t->speed / DEF_MISSILE_SPEED) * dsa + current->y;
+        dsb = end_y - DEF_MISSILE_START_Y;
+        dsa = (dsb + dsa) / 2;
+    } while (dsb - dsa > EPSILON);
+
+    return get_x_from_trajectory(t, end_y);
+}
+
+static float calc_speed(pos_t *pos_a, pos_t *pos_b, time_t t_time)
+{
+    return (float)(get_pos_distance(pos_a, pos_b) / t_time);
+}
+
+static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trg, time_t *t)
+{
+    time_t t_start, t_end;
+    int i;
+
+    t_start = clock();
+    *pos_a = get_target_pos(trg);
+    i = 0;
+
+    do
+    {
+        *pos_b = get_target_pos(trg);
+        if (get_pos_distance(pos_a, pos_b) <= 0)
+        {
+            ptask_wait_for_period();
+            def_missile_wait();
+        }
+        i++;
+    } while (get_pos_distance(pos_a, pos_b) <= 0 && i < LIMIT);
+
+    t_end = clock();
+    *t = (t_end - t_start) / CLOCKS_PER_SEC;
+    fprintf(stderr, "DONE\n");
+}
+
+static float get_start_x_position(int target)
+{
+    trajectory_t trajectory;
+    time_t t_total;
+    pos_t pos_a, pos_b;
+
+    collect_positions(&pos_a, &pos_b, target, &t_total);
+
+    trajectory.m = get_line_m(&pos_a, &pos_b);
+    trajectory.angle = get_line_angle(&pos_a, &pos_b);
+    trajectory.b = get_line_b_with_m(trajectory.m, &pos_a);
+    trajectory.speed = calc_speed(&pos_a, &pos_b, t_total);
+
+    return pos_a.x == pos_b.x ? get_expected_position_x(&trajectory, &pos_b) : pos_a.x;
+}
+
+static void set_missile_trajectory(missile_t *missile, float start_x)
+{
+    missile->partial_y = missile->y = DEF_MISSILE_START_Y;
+    missile->partial_x = missile->x = (int)start_x;
+    missile->angle = 90;
+    missile->speed = DEF_MISSILE_SPEED;
+}
+
+ptask def_thread()
+{
+    missile_t *self;
+    float start_x;
+    int task_index;
+
+    task_index = ptask_get_index();
+    self = ptask_get_argument();
+
+    start_x = get_start_x_position(self->target);
+    set_missile_trajectory(self, start_x);
+
+    task_missile_movement(self, task_index);
+
+    clear_atk_missile(self);
+}
+
+static void init_def_params(tpars *params, void *arg)
+{
+    ptask_param_init(*params);
+    ptask_param_period((*params), DEF_MISSILE_PERIOD, MILLI);
+    ptask_param_priority((*params), DEF_MISSILE_PRIO);
+    ptask_param_activation((*params), NOW);
+    params->arg = arg;
+}
+
+static int launch_def_thread(missile_t *missile)
+{
+    tpars params;
+
+    init_def_params(&params, missile);
+
+    return ptask_create_param(def_thread, &params);
 }
 
 static void init_def_missile(missile_t *missile, int index, int target)
@@ -438,6 +577,7 @@ ptask def_launcher()
 
         if (target != -1)
         {
+            fprintf(stderr, "Target %i\n", target);
             index = request_def_launch();
             launch_def_missile(index, target);
             def_wait();

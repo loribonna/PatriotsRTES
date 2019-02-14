@@ -105,6 +105,16 @@ void init_gestor()
  * COMMON FUNCTIONS
  */
 
+void init_empty_pos(pos_t *pos)
+{
+    pos->x = pos->y = -1;
+}
+
+int is_valid_pos(pos_t *pos)
+{
+    return pos->x >= 0 && pos->y >= 0;
+}
+
 int check_borders(int x, int y)
 {
     return x < XWIN &&
@@ -368,11 +378,11 @@ static void draw_labels(BITMAP *buffer, int atk_p, int def_p)
     draw_legends(buffer);
 }
 
-static void draw_missile(BITMAP *buffer, int x, int y, missile_type_t type)
+static void draw_missile(BITMAP *buffer, pos_t pos, missile_type_t type)
 {
     int color;
 
-    if (!check_borders(x, y))
+    if (!check_borders(pos.x, pos.y))
     {
         return;
     }
@@ -386,37 +396,41 @@ static void draw_missile(BITMAP *buffer, int x, int y, missile_type_t type)
         color = DEFENDER_COLOR;
     }
 
-    circlefill(buffer, x, y, MISSILE_RADIUS, color);
+    circlefill(buffer, pos.x, pos.y, MISSILE_RADIUS, color);
 
     return;
 }
 
-static void draw_wall(int x, int y, BITMAP *buffer)
+static void draw_wall(pos_t pos, BITMAP *buffer)
 {
-    putpixel(buffer, x, y, WALL_COLOR);
+    putpixel(buffer, pos.x, pos.y, WALL_COLOR);
 }
 
-static void draw_goal(int x, int y, BITMAP *buffer)
+static void draw_goal(pos_t pos, BITMAP *buffer)
 {
-    putpixel(buffer, x, y, GOAL_COLOR);
+    putpixel(buffer, pos.x, pos.y, GOAL_COLOR);
 }
 
 static void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
 {
     missile_type_t m_type;
+    pos_t pos;
+
+    pos.x = x;
+    pos.y = y;
 
     if (is_missile_cell(cell))
     {
         m_type = cell->type == ATK_MISSILE ? ATTACKER : DEFENDER;
-        draw_missile(buffer, x, y, m_type);
+        draw_missile(buffer, pos, m_type);
     }
     else if (is_wall_cell(cell))
     {
-        draw_wall(x, y, buffer);
+        draw_wall(pos, buffer);
     }
     else if (is_goal_cell(cell))
     {
-        draw_goal(x, y, buffer);
+        draw_goal(pos, buffer);
     }
 }
 
@@ -454,6 +468,31 @@ static void draw_buffer_to_screen()
 /**
  * DISPLAY THREAD
  */
+
+pos_t scan_env_for_target_pos(int target)
+{
+    pos_t pos;
+
+    sem_wait(&env.mutex);
+
+    for (pos.x = 0; pos.x < XWIN; pos.x++)
+    {
+        for (pos.y = 0; pos.y < YWIN; pos.y++)
+        {
+            if (env.cell[pos.x][pos.y].value == target)
+            {
+                sem_post(&env.mutex);
+                return pos;
+            }
+        }
+    }
+
+    sem_post(&env.mutex);
+
+    pos.x = -1;
+    pos.y = -1;
+    return pos;
+}
 
 int check_pixel(int x, int y)
 {
