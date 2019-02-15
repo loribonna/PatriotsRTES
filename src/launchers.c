@@ -439,9 +439,9 @@ static float get_line_m(pos_t *pos_a, pos_t *pos_b)
 {
     if (pos_b->x == pos_a->x)
     {
-        return 0;
+        return 0.0;
     }
-    return (pos_b->y - pos_a->y) / (pos_b->x - pos_a->x);
+    return (float)(pos_b->y - pos_a->y) / (float)(pos_b->x - pos_a->x);
 }
 
 static float get_line_angle(pos_t *pos_a, pos_t *pos_b)
@@ -454,6 +454,11 @@ static float get_line_b_with_m(float m, pos_t *pos)
     return -m * pos->x + pos->y;
 }
 
+static float get_y_from_trajectory(trajectory_t *t, float x)
+{
+    return t->m * x + t->b;
+}
+
 static float get_x_from_trajectory(trajectory_t *t, float y)
 {
     return t->m != 0 ? (y - t->b) / t->m : 0;
@@ -461,19 +466,27 @@ static float get_x_from_trajectory(trajectory_t *t, float y)
 
 static float get_expected_position_x(trajectory_t *t, pos_t *current)
 {
-    float dsa, end_y, dsb;
+    float x, y, dsa, dsb, tmp_dsa, x_min, x_max;
+    int i;
 
-    dsa = DS_AMOUNT(t->speed);
-    fprintf(stderr, "Predicted speed %f\n", t->speed);
+    i = 0;
+    x_min = t->m > 0 ? 0 : current->x;
+    x_max = t->m > 0 ? current->x : XWIN;
 
     do
     {
-        end_y = (t->speed / DEF_MISSILE_SPEED) * dsa + current->y;
-        dsb = end_y - DEF_MISSILE_START_Y;
-        dsa = (dsb + dsa) / 2;
-    } while (dsb - dsa > EPSILON);
+        x = (x_min + x_max) / 2;
+        y = get_y_from_trajectory(t, x);
 
-    return get_x_from_trajectory(t, end_y);
+        dsb = fabs(DEF_MISSILE_START_Y - y);
+        dsa = sqrt(pow(y - current->y, 2) + pow(x - current->x, 2));
+        tmp_dsa = (t->speed / DEF_MISSILE_SPEED) * dsb;
+
+        x_min = tmp_dsa < dsa ? x : x_min;
+        x_max = tmp_dsa > dsa ? x : x_max;
+    } while (fabs(tmp_dsa - dsa) > EPSILON && ++i < SAMPLE_LIMIT);
+
+    return x;
 }
 
 static float calc_speed(pos_t *pos_a, pos_t *pos_b, double t_time)

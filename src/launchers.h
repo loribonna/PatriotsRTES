@@ -24,7 +24,6 @@
 
 #define MISSILE_RADIUS 5
 #define DEF_MISSILE_START_Y (GOAL_START_Y - MISSILE_RADIUS - 1)
-#define DS_AMOUNT(speed) (10 / speed)
 #define DEF_MISSILE_SPEED 130
 
 #define WAIT_UPDATE 0
