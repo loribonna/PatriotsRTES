@@ -459,19 +459,14 @@ static float get_y_from_trajectory(trajectory_t *t, float x)
     return t->m * x + t->b;
 }
 
-static float get_x_from_trajectory(trajectory_t *t, float y)
-{
-    return t->m != 0 ? (y - t->b) / t->m : 0;
-}
-
 static float get_expected_position_x(trajectory_t *t, pos_t *current)
 {
     float x, y, dsa, dsb, tmp_dsa, x_min, x_max;
     int i;
 
     i = 0;
-    x_min = t->m > 0 ? 0 : current->x;
-    x_max = t->m > 0 ? current->x : XWIN;
+    x_min = t->m < 0 ? 0 : current->x;
+    x_max = t->m < 0 ? current->x : XWIN;
 
     do
     {
@@ -485,6 +480,8 @@ static float get_expected_position_x(trajectory_t *t, pos_t *current)
         x_min = tmp_dsa < dsa ? x : x_min;
         x_max = tmp_dsa > dsa ? x : x_max;
     } while (fabs(tmp_dsa - dsa) > EPSILON && ++i < SAMPLE_LIMIT);
+
+    fprintf(stderr, "%f %f %f %i\n", dsa, dsb, x, i);
 
     return x;
 }
@@ -547,6 +544,9 @@ static float get_start_x_position(int target)
         trajectory.b = get_line_b_with_m(trajectory.m, &pos_a);
         trajectory.speed = calc_speed(&pos_a, &pos_b, dt);
 
+        fprintf(stderr, "Calculated speed for target %i: %f\n",
+                target, trajectory.speed);
+
         return get_expected_position_x(&trajectory, &pos_b);
     }
 }
@@ -573,7 +573,7 @@ ptask def_thread()
 
     task_missile_movement(self, task_index);
 
-    clear_atk_missile(self);
+    clear_def_missile(self);
 }
 
 static void init_def_params(tpars *params, void *arg)
