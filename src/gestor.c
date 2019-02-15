@@ -27,11 +27,7 @@ static int wall_init_check(int x, int y)
 
 static void reset_buffer()
 {
-    sem_wait(&env.mutex);
-
     clear_to_color(buffer, BKG_COLOR);
-
-    sem_post(&env.mutex);
 }
 
 static void init_cell_empty(cell_t *cell)
@@ -80,7 +76,7 @@ static void display_init()
 
 static void init_env()
 {
-    int x, y;
+    int x, y, i;
 
     env.atk_points = env.def_points = 0;
 
@@ -90,6 +86,11 @@ static void init_env()
         {
             init_cell(x, y);
         }
+    }
+
+    for (i = 0; i < ENV_PRIOS; i++)
+    {
+        init_private_sem(&(env.prio_sem[i]));
     }
 
     sem_init(&env.mutex, 0, 1);
@@ -140,15 +141,6 @@ float get_deltatime(int task_index, int unit)
  * CELLS CHECK
  */
 
-void clear_cell(int x, int y)
-{
-    sem_wait(&env.mutex);
-
-    init_cell_empty(&(env.cell[x][y]));
-
-    sem_post(&env.mutex);
-}
-
 static int is_empty_cell(cell_t *cell)
 {
     return (cell->type == EMPTY) ||
@@ -173,6 +165,68 @@ static int is_goal_cell(cell_t *cell)
     return !is_empty_cell(cell) &&
            cell->type == GOAL &&
            cell->value == OTHER_CELL;
+}
+
+/**
+ * ENV ACCESS
+ */
+
+static void access_env(int prio)
+{
+    int lock;
+
+    sem_wait(&env.mutex);
+
+    switch (prio)
+    {
+    case 0:
+        lock = env.prio_sem[0].count ||
+               env.prio_sem[0].blk;
+        break;
+    case 1:
+        lock = env.prio_sem[0].count ||
+               env.prio_sem[0].blk ||
+               env.prio_sem[1].count ||
+               env.prio_sem[1].blk;
+        break;
+    default:
+        lock = 0;
+        break;
+    }
+
+    if (lock)
+    {
+        env.prio_sem[prio].blk++;
+        sem_post(&env.mutex);
+        sem_wait(&(env.prio_sem[prio].sem));
+        env.prio_sem[prio].blk--;
+    }
+    env.prio_sem[prio].count++;
+
+    sem_post(&env.mutex);
+}
+
+static void release_env(int prio)
+{
+    int next_prio;
+
+    sem_wait(&env.mutex);
+
+    env.prio_sem[prio].count--;
+    next_prio = (prio + 1) % ENV_PRIOS;
+
+    if (env.prio_sem[next_prio].blk)
+    {
+        sem_post(&(env.prio_sem[next_prio].sem));
+    }
+    else if (env.prio_sem[prio].blk)
+    {
+        sem_post(&(env.prio_sem[prio].sem));
+    }
+    else
+    {
+        sem_post(&env.mutex);
+    }
 }
 
 /**
@@ -298,8 +352,6 @@ int update_missile_position(missile_t *missile, int oldx, int oldy)
 {
     int collided;
 
-    sem_wait(&env.mutex);
-
     init_cell_empty(&(env.cell[oldx][oldy]));
 
     collided = handle_collisions_around_missile(missile, MISSILE_RADIUS);
@@ -309,8 +361,6 @@ int update_missile_position(missile_t *missile, int oldx, int oldy)
         update_missile_cell(missile);
     }
 
-    sem_post(&env.mutex);
-
     return collided;
 }
 
@@ -318,16 +368,18 @@ int update_missile_env(missile_t *missile, int oldx, int oldy)
 {
     int collided;
 
-    sem_wait(&missile->mutex);
+    access_env(MIDDLE_ENV_PRIO);
 
     if (missile->deleted)
     {
-        sem_post(&missile->mutex);
-        return 1;
+        collided = 1;
+    }
+    else
+    {
+        collided = update_missile_position(missile, oldx, oldy);
     }
 
-    collided = update_missile_position(missile, oldx, oldy);
-    sem_post(&missile->mutex);
+    release_env(MIDDLE_ENV_PRIO);
 
     return collided;
 }
@@ -438,7 +490,7 @@ void draw_env()
 {
     int x, y;
 
-    sem_wait(&env.mutex);
+    access_env(HIGH_ENV_PRIO);
 
     for (x = 0; x < XWIN; x++)
     {
@@ -453,16 +505,12 @@ void draw_env()
 
     draw_labels(buffer, env.atk_points, env.def_points);
 
-    sem_post(&env.mutex);
+    release_env(HIGH_ENV_PRIO);
 }
 
 static void draw_buffer_to_screen()
 {
-    sem_wait(&env.mutex);
-
     blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
-
-    sem_post(&env.mutex);
 }
 
 /**
@@ -473,7 +521,7 @@ pos_t scan_env_for_target_pos(int target)
 {
     pos_t pos;
 
-    sem_wait(&env.mutex);
+    access_env(LOW_ENV_PRIO);
 
     for (pos.x = 0; pos.x < XWIN; pos.x++)
     {
@@ -487,7 +535,7 @@ pos_t scan_env_for_target_pos(int target)
         }
     }
 
-    sem_post(&env.mutex);
+    release_env(LOW_ENV_PRIO);
 
     pos.x = -1;
     pos.y = -1;
@@ -508,7 +556,7 @@ int search_screen_for_target()
 {
     int x, y, target;
 
-    sem_wait(&env.mutex);
+    access_env(LOW_ENV_PRIO);
 
     for (y = 0; y < YWIN; y++)
     {
@@ -523,7 +571,7 @@ int search_screen_for_target()
         }
     }
 
-    sem_post(&env.mutex);
+    release_env(LOW_ENV_PRIO);
 
     return -1;
 }

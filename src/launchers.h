@@ -22,15 +22,17 @@
 #define DEF_MISSILE_PRIO 4
 #define DEF_MISSILE_PERIOD 20
 
-#define DEF_MISSILE_DELAY 25 * 1000 * 1000 // 25 milliseconds
-
 #define MISSILE_RADIUS 5
 #define DEF_MISSILE_START_Y (GOAL_START_Y - MISSILE_RADIUS - 1)
 #define DS_AMOUNT(speed) (10 / speed)
 #define DEF_MISSILE_SPEED 130
 
-#define LIMIT 100
-#define EPSILON 0.1
+#define WAIT_UPDATE 0
+#define UPDATED 1
+
+#define SAMPLE_LIMIT 50
+#define MIN_SAMPLES 5
+#define EPSILON 0.01
 #define N 4
 
 typedef enum
@@ -41,8 +43,9 @@ typedef enum
 
 typedef struct
 {
-    sem_t s;
-    int c;
+    sem_t sem;
+    int count;
+    int blk;
 } private_sem_t;
 
 typedef struct
@@ -54,7 +57,7 @@ typedef struct
     int target;
     int deleted;
     int cleared;
-    private_sem_t priv_sem;
+    private_sem_t update_sem;
     sem_t mutex;
     missile_type_t missile_type;
 } missile_t;
@@ -96,6 +99,8 @@ void launch_def_launcher();
 void delete_def_missile(int index);
 
 int is_already_tracked(int target);
+
+void init_private_sem(private_sem_t *p_sem);
 
 #include "gestor.h"
 

@@ -44,6 +44,11 @@
 #define M_PI 3.14159265358979323846
 #define DELTA_FACTOR 1000
 
+#define ENV_PRIOS 3
+#define LOW_ENV_PRIO 2
+#define MIDDLE_ENV_PRIO 1
+#define HIGH_ENV_PRIO 0
+
 typedef struct
 {
     int atk_hit;
@@ -76,6 +81,7 @@ typedef struct
 {
     cell_t cell[XWIN][YWIN];
     int def_points, atk_points;
+    private_sem_t prio_sem[ENV_PRIOS];
     sem_t mutex;
 } env_t;
 

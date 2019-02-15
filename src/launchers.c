@@ -9,6 +9,12 @@ missile_gestor_t def_gestor;
  * INITIALZATIONS
  */
 
+void init_private_sem(private_sem_t *p_sem)
+{
+    p_sem->blk = p_sem->count = 0;
+    sem_init(&p_sem->sem, 0, 0);
+}
+
 static void init_queue(fifo_queue_gestor_t *gestor)
 {
     int i;
@@ -23,16 +29,14 @@ static void init_queue(fifo_queue_gestor_t *gestor)
 
     sem_init(&(gestor->mutex), 0, 1);
 
-    sem_init(&(gestor->read_sem).s, 0, 0);
-    gestor->read_sem.c = 0;
-
-    sem_init(&(gestor->write_sem.s), 0, 0);
-    gestor->write_sem.c = 0;
+    init_private_sem(&gestor->read_sem);
+    init_private_sem(&gestor->write_sem);
 }
 
 static void init_empty_missile(missile_t *missile)
 {
     sem_init(&missile->mutex, 0, 1);
+    init_private_sem(&missile->update_sem);
     missile->deleted = missile->cleared = 0;
     missile->speed = missile->angle = 0;
     missile->x = missile->y = 0;
@@ -73,7 +77,7 @@ void init_launchers()
 
 void update_queue_head(fifo_queue_gestor_t *gestor, int index)
 {
-    assert(index >= 0 && gestor->read_sem.c > 0);
+    assert(index >= 0 && gestor->read_sem.blk > 0);
 
     gestor->next[index] = -1;
     if (gestor->headIndex == -1)
@@ -96,7 +100,7 @@ void request_atk_launch()
 
     sem_wait(&(gestor->mutex));
 
-    if (gestor->freeIndex == -1 || !gestor->read_sem.c)
+    if (gestor->freeIndex == -1 || !gestor->read_sem.blk)
     {
         sem_post(&(gestor->mutex));
     }
@@ -105,7 +109,7 @@ void request_atk_launch()
         index = gestor->freeIndex;
         gestor->freeIndex = gestor->next[gestor->freeIndex];
         update_queue_head(gestor, index);
-        sem_post(&(gestor->read_sem).s);
+        sem_post(&(gestor->read_sem).sem);
     }
 }
 
@@ -118,12 +122,12 @@ int request_def_launch()
 
     sem_wait(&(gestor->mutex));
 
-    if (gestor->freeIndex == -1 || gestor->write_sem.c)
+    if (gestor->freeIndex == -1 || gestor->write_sem.blk)
     {
-        gestor->write_sem.c++;
+        gestor->write_sem.blk++;
         sem_post(&(gestor->mutex));
-        sem_wait(&(gestor->write_sem.s));
-        gestor->write_sem.c--;
+        sem_wait(&(gestor->write_sem.sem));
+        gestor->write_sem.blk--;
     }
 
     index = gestor->freeIndex;
@@ -142,10 +146,10 @@ static int get_next_index(fifo_queue_gestor_t *gestor)
 
     if (gestor->headIndex == -1)
     {
-        gestor->read_sem.c++;
+        gestor->read_sem.blk++;
         sem_post(&(gestor->mutex));
-        sem_wait(&(gestor->read_sem.s));
-        gestor->read_sem.c--;
+        sem_wait(&(gestor->read_sem.sem));
+        gestor->read_sem.blk--;
     }
 
     assert(gestor->headIndex >= 0);
@@ -167,9 +171,9 @@ static void splice_index(fifo_queue_gestor_t *gestor, int index)
     gestor->next[index] = gestor->freeIndex;
     gestor->freeIndex = index;
 
-    if (gestor->write_sem.c)
+    if (gestor->write_sem.blk)
     {
-        sem_post(&gestor->write_sem.s);
+        sem_post(&gestor->write_sem.sem);
     }
     else
     {
@@ -180,45 +184,6 @@ static void splice_index(fifo_queue_gestor_t *gestor, int index)
 /**
  * MISSILE FUNCTIONS
  */
-
-static int is_deleted_missile(missile_t *missile)
-{
-    int deleted;
-
-    sem_wait(&missile->mutex);
-
-    deleted = missile->deleted;
-
-    sem_post(&missile->mutex);
-
-    return deleted;
-}
-
-static void move_missile(missile_t *missile, float deltatime)
-{
-    float dx, dy, angle_rad;
-
-    sem_wait(&missile->mutex);
-
-    if (missile->deleted)
-    {
-        sem_post(&missile->mutex);
-        return;
-    }
-
-    angle_rad = missile->angle * (M_PI / 180);
-
-    dx = missile->speed * cos(angle_rad);
-    dy = missile->speed * sin(angle_rad);
-
-    missile->partial_x += dx * deltatime;
-    missile->partial_y += dy * deltatime;
-
-    missile->x = (int)missile->partial_x;
-    missile->y = (int)missile->partial_y;
-
-    sem_post(&missile->mutex);
-}
 
 static void init_atk_params(tpars *params, void *arg)
 {
@@ -231,8 +196,6 @@ static void init_atk_params(tpars *params, void *arg)
 
 void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
 {
-    sem_wait(&missile->mutex);
-
     if (!missile->cleared)
     {
         missile->cleared = 1;
@@ -240,8 +203,55 @@ void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
 
         splice_index(gestor, missile->index);
     }
+}
 
+static int move_missile(missile_t *missile, float deltatime)
+{
+    float dx, dy, angle_rad;
+
+    angle_rad = missile->angle * (M_PI / 180);
+
+    dx = missile->speed * cos(angle_rad);
+    dy = missile->speed * sin(angle_rad);
+
+    missile->partial_x += dx * deltatime;
+    missile->partial_y += dy * deltatime;
+
+    missile->x = (int)missile->partial_x;
+    missile->y = (int)missile->partial_y;
+
+    return 0;
+}
+
+static void wait_missile_update(missile_t *missile)
+{
+    sem_wait(&missile->mutex);
+    if (missile->update_sem.count == WAIT_UPDATE)
+    {
+        missile->update_sem.blk++;
+        sem_post(&missile->mutex);
+        sem_wait(&missile->update_sem.sem);
+        missile->update_sem.blk--;
+    }
+    assert(missile->update_sem.count == UPDATED);
+    missile->update_sem.count = WAIT_UPDATE;
     sem_post(&missile->mutex);
+}
+
+static void signal_missile_update(missile_t *missile)
+{
+    sem_wait(&missile->mutex);
+
+    missile->update_sem.count = UPDATED;
+
+    if (missile->update_sem.blk)
+    {
+        sem_post(&missile->update_sem.sem);
+    }
+    else
+    {
+        sem_post(&missile->mutex);
+    }
 }
 
 static void task_missile_movement(missile_t *missile, int task_index)
@@ -249,24 +259,37 @@ static void task_missile_movement(missile_t *missile, int task_index)
     int oldx, oldy, collided;
     float deltatime;
 
-    collided = 0;
     deltatime = get_deltatime(task_index, MILLI);
 
-    while (!is_deleted_missile(missile) && !collided)
+    do
     {
         oldx = missile->x;
         oldy = missile->y;
-        move_missile(missile, deltatime);
 
+        move_missile(missile, deltatime);
         collided = update_missile_env(missile, oldx, oldy);
 
-        ptask_wait_for_period();
-    }
-}
+        signal_missile_update(missile);
 
+        ptask_wait_for_period();
+    } while (!collided);
+}
 /**
  * ATTACK THREADS
  */
+
+static pos_t get_target_pos(int target)
+{
+    missile_t *m_target;
+    pos_t pos;
+
+    m_target = &(atk_gestor.queue[target]);
+    wait_missile_update(m_target);
+
+    pos = scan_env_for_target_pos(target);
+
+    return pos;
+}
 
 void clear_atk_missile(missile_t *missile)
 {
@@ -313,6 +336,8 @@ static void set_random_start(missile_t *missile)
 
     missile->x = (int)missile->partial_x;
     missile->y = (int)missile->partial_y;
+
+    fprintf(stderr, "Created atk with speed %f\n", missile->speed);
 }
 
 static void init_atk_missile(missile_t *missile, int index)
@@ -374,14 +399,6 @@ void delete_atk_missile(int index)
  * DEFENDER THREADS
  */
 
-static void def_missile_wait()
-{
-    struct timespec t;
-    t.tv_sec = 0;
-    t.tv_nsec = DEF_MISSILE_DELAY;
-    nanosleep(&t, NULL);
-}
-
 static void def_wait()
 {
     struct timespec t;
@@ -429,7 +446,7 @@ static float get_line_m(pos_t *pos_a, pos_t *pos_b)
 
 static float get_line_angle(pos_t *pos_a, pos_t *pos_b)
 {
-    return atan2((pos_b->y - pos_a->y), (pos_b->x - pos_a->x));
+    return (atan2((pos_b->y - pos_a->y), (pos_b->x - pos_a->x)) * 180) / M_PI;
 }
 
 static float get_line_b_with_m(float m, pos_t *pos)
@@ -447,6 +464,7 @@ static float get_expected_position_x(trajectory_t *t, pos_t *current)
     float dsa, end_y, dsb;
 
     dsa = DS_AMOUNT(t->speed);
+    fprintf(stderr, "Predicted speed %f\n", t->speed);
 
     do
     {
@@ -458,50 +476,66 @@ static float get_expected_position_x(trajectory_t *t, pos_t *current)
     return get_x_from_trajectory(t, end_y);
 }
 
-static float calc_speed(pos_t *pos_a, pos_t *pos_b, time_t t_time)
+static float calc_speed(pos_t *pos_a, pos_t *pos_b, double t_time)
 {
+    assert(t_time > 0);
     return (float)(get_pos_distance(pos_a, pos_b) / t_time);
 }
 
-static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trg, time_t *t)
+static double calc_dt(struct timespec t_start, struct timespec t_end)
 {
-    time_t t_start, t_end;
+    return (double)(t_end.tv_sec - t_start.tv_sec) +
+           (t_end.tv_nsec - t_start.tv_nsec) / 1000000000.0;
+}
+
+static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trg, double *dt)
+{
+    struct timespec t_start, t_end;
+    float speed_a, speed_b;
     int i;
 
-    t_start = clock();
+    clock_gettime(CLOCK_MONOTONIC, &t_start);
     *pos_a = get_target_pos(trg);
-    i = 0;
+    speed_b = i = 0;
 
     do
     {
-        *pos_b = get_target_pos(trg);
-        if (get_pos_distance(pos_a, pos_b) <= 0)
-        {
-            ptask_wait_for_period();
-            def_missile_wait();
-        }
-        i++;
-    } while (get_pos_distance(pos_a, pos_b) <= 0 && i < LIMIT);
+        speed_a = speed_b;
 
-    t_end = clock();
-    *t = (t_end - t_start) / CLOCKS_PER_SEC;
-    fprintf(stderr, "DONE\n");
+        *pos_b = get_target_pos(trg);
+        clock_gettime(CLOCK_MONOTONIC, &t_end);
+        *dt = calc_dt(t_start, t_end);
+        speed_b = calc_speed(pos_a, pos_b, *dt);
+
+        ptask_wait_for_period();
+        i++;
+    } while ((fabs(speed_b - speed_a) > EPSILON || i < MIN_SAMPLES) &&
+             i < SAMPLE_LIMIT);
 }
 
 static float get_start_x_position(int target)
 {
     trajectory_t trajectory;
-    time_t t_total;
+    double dt;
     pos_t pos_a, pos_b;
 
-    collect_positions(&pos_a, &pos_b, target, &t_total);
+    collect_positions(&pos_a, &pos_b, target, &dt);
 
-    trajectory.m = get_line_m(&pos_a, &pos_b);
-    trajectory.angle = get_line_angle(&pos_a, &pos_b);
-    trajectory.b = get_line_b_with_m(trajectory.m, &pos_a);
-    trajectory.speed = calc_speed(&pos_a, &pos_b, t_total);
+    assert(dt != 0);
 
-    return pos_a.x == pos_b.x ? get_expected_position_x(&trajectory, &pos_b) : pos_a.x;
+    if (pos_a.x == pos_b.x)
+    {
+        return pos_a.x;
+    }
+    else
+    {
+        trajectory.m = get_line_m(&pos_a, &pos_b);
+        trajectory.angle = get_line_angle(&pos_a, &pos_b);
+        trajectory.b = get_line_b_with_m(trajectory.m, &pos_a);
+        trajectory.speed = calc_speed(&pos_a, &pos_b, dt);
+
+        return get_expected_position_x(&trajectory, &pos_b);
+    }
 }
 
 static void set_missile_trajectory(missile_t *missile, float start_x)
@@ -509,7 +543,7 @@ static void set_missile_trajectory(missile_t *missile, float start_x)
     missile->partial_y = missile->y = DEF_MISSILE_START_Y;
     missile->partial_x = missile->x = (int)start_x;
     missile->angle = 90;
-    missile->speed = DEF_MISSILE_SPEED;
+    missile->speed = -DEF_MISSILE_SPEED;
 }
 
 ptask def_thread()
@@ -560,7 +594,7 @@ static void launch_def_missile(int index, int target)
     missile_t *missile;
     int thread;
 
-    missile = &(atk_gestor.queue[index]);
+    missile = &(def_gestor.queue[index]);
     init_def_missile(missile, index, target);
 
     thread = launch_def_thread(missile);
