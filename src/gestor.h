@@ -7,6 +7,9 @@
 #include "ptask.h"
 #include "launchers.h"
 
+// Refresh rate of the screen (updates per second)
+#define REFRESH_RATE 30
+
 #define WALL_THICKNESS 2
 #define GOAL_START_Y (YWIN * 0.8)
 #define EMPTY_CELL -1
@@ -38,7 +41,7 @@
 
 #define get_y_label(s) (YWIN - s * LABEL_Y)
 
-#define DISPLAY_PERIOD 20
+#define DISPLAY_PERIOD ((int)(1000 / REFRESH_RATE))
 #define DISPLAY_PRIO 3
 
 #define M_PI 3.14159265358979323846

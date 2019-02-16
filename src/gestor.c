@@ -600,5 +600,6 @@ void launch_display_manager()
 
     assert(task >= 0);
 
-    fprintf(stderr, "Created DISPLAY manager\n");
+    fprintf(stderr, "Created DISPLAY manager with period: %i\n",
+            DISPLAY_PERIOD);
 }
