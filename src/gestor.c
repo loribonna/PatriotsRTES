@@ -33,19 +33,19 @@ static void reset_buffer()
 static void init_cell_empty(cell_t *cell)
 {
     cell->type = EMPTY;
-    cell->value = EMPTY_CELL;
+    cell->target = cell->value = EMPTY_CELL;
 }
 
 static void init_wall_cell(cell_t *cell)
 {
     cell->type = WALL;
-    cell->value = OTHER_CELL;
+    cell->target = cell->value = OTHER_CELL;
 }
 
 static void init_goal_cell(cell_t *cell)
 {
     cell->type = GOAL;
-    cell->value = OTHER_CELL;
+    cell->target = cell->value = OTHER_CELL;
 }
 
 static void init_cell(int x, int y)
@@ -178,25 +178,15 @@ static int is_goal_cell(cell_t *cell)
 
 static void access_env(int prio)
 {
-    int lock;
+    int lock, p;
 
     sem_wait(&env.mutex);
+    lock = 0;
 
-    switch (prio)
+    for (p = prio; p >= 0; p--)
     {
-    case 0:
-        lock = env.prio_sem[0].count ||
-               env.prio_sem[0].blk;
-        break;
-    case 1:
-        lock = env.prio_sem[0].count ||
-               env.prio_sem[0].blk ||
-               env.prio_sem[1].count ||
-               env.prio_sem[1].blk;
-        break;
-    default:
-        lock = 0;
-        break;
+        lock |= env.prio_sem[p].count ||
+                env.prio_sem[p].blk;
     }
 
     if (lock)
@@ -218,20 +208,19 @@ static void release_env(int prio)
     sem_wait(&env.mutex);
 
     env.prio_sem[prio].count--;
-    next_prio = (prio + 1) % ENV_PRIOS;
 
-    if (env.prio_sem[next_prio].blk)
+    next_prio = prio;
+    do
     {
-        sem_post(&(env.prio_sem[next_prio].sem));
-    }
-    else if (env.prio_sem[prio].blk)
-    {
-        sem_post(&(env.prio_sem[prio].sem));
-    }
-    else
-    {
-        sem_post(&env.mutex);
-    }
+        next_prio = (next_prio + 1) % ENV_PRIOS;
+        if (env.prio_sem[next_prio].blk)
+        {
+            sem_post(&(env.prio_sem[next_prio].sem));
+            return;
+        }
+    } while (next_prio != prio);
+
+    sem_post(&env.mutex);
 }
 
 /**
@@ -354,6 +343,7 @@ static void update_missile_cell(missile_t *missile)
 
     env.cell[x][y].value = missile->index;
     env.cell[x][y].type = type;
+    env.cell[x][y].target = missile->assigned_target;
 }
 
 int update_missile_position(missile_t *missile, int oldx, int oldy)
@@ -402,7 +392,7 @@ pos_t scan_env_for_target_pos(int target)
     {
         for (pos.y = 0; pos.y < YWIN; pos.y++)
         {
-            if (env.cell[pos.x][pos.y].value == target)
+            if (env.cell[pos.x][pos.y].target == target)
             {
                 sem_post(&env.mutex);
                 return pos;
@@ -419,17 +409,20 @@ pos_t scan_env_for_target_pos(int target)
 
 int check_pixel(int x, int y)
 {
-    if (getpixel(screen, x, y) == ATTACKER_COLOR)
+    cell_t cell = env.cell[x][y];
+
+    if (getpixel(screen, x, y) == ATTACKER_COLOR &&
+        cell.value >= 0)
     {
-        return !is_already_tracked(env.cell[x][y].value);
+        return !is_already_tracked(cell.target);
     }
 
     return 0;
 }
 
-int search_screen_for_target()
+int search_screen_for_target(int t_assign)
 {
-    int x, y, target;
+    int x, y;
 
     access_env(LOW_ENV_PRIO);
 
@@ -439,16 +432,17 @@ int search_screen_for_target()
         {
             if (check_pixel(x, y))
             {
-                target = env.cell[x][y].value;
+                assign_target_to_atk(env.cell[x][y].value, t_assign);
+                env.cell[x][y].target = t_assign;
                 sem_post(&env.mutex);
-                return target;
+                return 1;
             }
         }
     }
 
     release_env(LOW_ENV_PRIO);
 
-    return -1;
+    return 0;
 }
 
 /**
