@@ -1,46 +1,62 @@
-#---------------------------------------------------
-#	Directory with output compiled files
-#---------------------------------------------------
-OUT = ./build
-#---------------------------------------------------
-#	Directory with source files
-#---------------------------------------------------
+# Directory with output compiled files
+OUT_BUILD = ./build
+#Directory with output for test purposes
+OUT_TEST = ./test
+
+# Source files
 SRC = ./src
-#---------------------------------------------------
-#	Target file to be compiled
-#---------------------------------------------------
+
+# Target file to be compiled
 MAIN = patriots
-#---------------------------------------------------
-#	Compiler to be used
-#---------------------------------------------------
+
+#Files to compile
+BASE_FILES = $(MAIN) gestor launchers
+SOURCE_FILES = $(addsuffix .c, $(addprefix $(SRC)/, $(BASE_FILES)))
+OUT_FILES = $(addsuffix .o, $(addprefix $(OUT_BUILD)/, $(BASE_FILES)))
+
+# Headers
+INCLUDE = -I./include
+
+# Compiler to be used
 CC = gcc
-#---------------------------------------------------
-#	External header files
-#---------------------------------------------------
-INCLUDES = -I./include
-#---------------------------------------------------
-#	Options to the compiler
-#---------------------------------------------------
-CFLAGS = ${INCLUDES} -Wall -lrt -lm
-#---------------------------------------------------
-#	Specify 'allegro' as external library
-#---------------------------------------------------
+# Options to the compiler
+CFLAGS = -Wall -lrt -lm
+ALL_FLAGE = $(INCLUDE) $(CFLAGS)
+
+# Libraries
 LIB_ALLEGRO = -lpthread `allegro-config --libs`
-LIB_PTASK = -L./lib
+LIB_PTASK = -L./lib -lptask
 
-LIBS = ${LIB_PTASK} ${LIB_ALLEGRO}
+LIBS = $(LIB_PTASK) $(LIB_ALLEGRO)
 
-#---------------------------------------------------
-#	Default command to build: make
-#---------------------------------------------------
-${OUT}/$(MAIN): ${OUT}/$(MAIN).o
-	$(CC) $(CFLAGS) $(LIBS) -o $(OUT)/$(MAIN) ${OUT}/$(MAIN).o
+# ---------------------
+# SECTION: BUILD
+# ---------------------
 
-${OUT}/$(MAIN).o: ${SRC}/$(MAIN).c
-	$(CC) -c ${SRC}/$(MAIN).c -o ${OUT}/$(MAIN).o
+all: clean build
 
-#---------------------------------------------------
-# Command to clean inline: make clean
-#---------------------------------------------------
+# Default command to build: make
+build: compile link 
+
+compile: $(SOURCE_FILES)
+	$(foreach f, $^, \
+		$(CC) -g -c $f -o $(OUT_BUILD)/$(basename $(notdir $f)).o $(CFLAGS);)
+
+link: $(OUT_FILES)
+	$(CC) -o $(OUT_BUILD)/$(MAIN) $(OUT_FILES) $(LIBS) $(CFLAGS)
+
+# ---------------------
+# SECTION: CLEAN
+# ---------------------
+
+# Command to clean: make clean
 clean:
-	rm $(OUT)/**.*
+	rm -f $(OUT_BUILD)/*
+
+# ---------------------
+# SECTION: RUN
+# ---------------------
+
+# Command to build and run main: make run
+run: clean-build build
+	$(OUT_BUILD)/$(MAIN)

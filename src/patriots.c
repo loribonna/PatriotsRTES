@@ -1,5 +1,47 @@
 #include "patriots.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <assert.h>
 
-int main(void) {
-    printf("HELLO WORLD!");
+void init()
+{
+    init_gestor();
+
+    init_launchers();
+
+    ptask_init(SCHED_FIFO, 1, 2);
+}
+
+void spawn_tasks()
+{
+    launch_display_manager();
+
+    launch_atk_launcher();
+}
+
+int main(void)
+{
+    int c, k;
+
+    init();
+
+    spawn_tasks();
+
+    do
+    {
+        k = 0;
+        if (keypressed())
+        {
+            c = readkey();
+            k = c >> 8;
+            if (k == KEY_SPACE)
+            {
+                request_atk_launch(&atk_gestor.gestor);
+            }
+        }
+
+    } while (k != KEY_ESC);
+
+    allegro_exit();
+    return 0;
 }
