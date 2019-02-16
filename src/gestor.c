@@ -27,11 +27,7 @@ static int wall_init_check(int x, int y)
 
 static void reset_buffer()
 {
-    sem_wait(&env.mutex);
-
     clear_to_color(buffer, BKG_COLOR);
-
-    sem_post(&env.mutex);
 }
 
 static void init_cell_empty(cell_t *cell)
@@ -72,7 +68,7 @@ static void display_init()
 {
     allegro_init();
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
-    clear_to_color(screen, 0);
+    clear_to_color(screen, BKG_COLOR);
     install_keyboard();
 
     buffer = create_bitmap(XWIN, YWIN);
@@ -80,7 +76,7 @@ static void display_init()
 
 static void init_env()
 {
-    int x, y;
+    int x, y, i;
 
     env.atk_points = env.def_points = 0;
 
@@ -90,6 +86,11 @@ static void init_env()
         {
             init_cell(x, y);
         }
+    }
+
+    for (i = 0; i < ENV_PRIOS; i++)
+    {
+        init_private_sem(&(env.prio_sem[i]));
     }
 
     sem_init(&env.mutex, 0, 1);
@@ -104,6 +105,21 @@ void init_gestor()
 /**
  * COMMON FUNCTIONS
  */
+
+cell_type_t missile_to_cell_type(missile_type_t m_type)
+{
+    return m_type == ATTACKER ? ATK_MISSILE : DEF_MISSILE;
+}
+
+void init_empty_pos(pos_t *pos)
+{
+    pos->x = pos->y = -1;
+}
+
+int is_valid_pos(pos_t *pos)
+{
+    return pos->x >= 0 && pos->y >= 0;
+}
 
 int check_borders(int x, int y)
 {
@@ -129,15 +145,6 @@ float get_deltatime(int task_index, int unit)
 /**
  * CELLS CHECK
  */
-
-void clear_cell(int x, int y)
-{
-    sem_wait(&env.mutex);
-
-    init_cell_empty(&(env.cell[x][y]));
-
-    sem_post(&env.mutex);
-}
 
 static int is_empty_cell(cell_t *cell)
 {
@@ -166,6 +173,68 @@ static int is_goal_cell(cell_t *cell)
 }
 
 /**
+ * ENV ACCESS
+ */
+
+static void access_env(int prio)
+{
+    int lock;
+
+    sem_wait(&env.mutex);
+
+    switch (prio)
+    {
+    case 0:
+        lock = env.prio_sem[0].count ||
+               env.prio_sem[0].blk;
+        break;
+    case 1:
+        lock = env.prio_sem[0].count ||
+               env.prio_sem[0].blk ||
+               env.prio_sem[1].count ||
+               env.prio_sem[1].blk;
+        break;
+    default:
+        lock = 0;
+        break;
+    }
+
+    if (lock)
+    {
+        env.prio_sem[prio].blk++;
+        sem_post(&env.mutex);
+        sem_wait(&(env.prio_sem[prio].sem));
+        env.prio_sem[prio].blk--;
+    }
+    env.prio_sem[prio].count++;
+
+    sem_post(&env.mutex);
+}
+
+static void release_env(int prio)
+{
+    int next_prio;
+
+    sem_wait(&env.mutex);
+
+    env.prio_sem[prio].count--;
+    next_prio = (prio + 1) % ENV_PRIOS;
+
+    if (env.prio_sem[next_prio].blk)
+    {
+        sem_post(&(env.prio_sem[next_prio].sem));
+    }
+    else if (env.prio_sem[prio].blk)
+    {
+        sem_post(&(env.prio_sem[prio].sem));
+    }
+    else
+    {
+        sem_post(&env.mutex);
+    }
+}
+
+/**
  * COLLISIONS MANAGEMENT
  */
 
@@ -179,9 +248,9 @@ static void atk_point()
     env.atk_points++;
 }
 
-static cell_type handle_collision_by_cell_type(cell_t *cell)
+static cell_type_t handle_collision_by_cell_type(cell_t *cell)
 {
-    cell_type type;
+    cell_type_t type;
 
     type = cell->type;
 
@@ -208,7 +277,7 @@ static cell_type handle_collision_by_cell_type(cell_t *cell)
 
 static int handle_collision(missile_type_t missile_type, cell_t *cell)
 {
-    cell_type type;
+    cell_type_t type;
 
     type = handle_collision_by_cell_type(cell);
 
@@ -235,14 +304,17 @@ static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
 {
     int x, y;
     missile_type_t missile_type;
+    cell_type_t cell_type;
 
     missile_type = missile->missile_type;
+    cell_type = missile_to_cell_type(missile_type);
 
     for (x = xa; x < xb; x++)
     {
         for (y = ya; y < yb; y++)
         {
-            if (env.cell[x][y].value != missile->index &&
+            if ((env.cell[x][y].value != missile->index ||
+                 env.cell[x][y].type != cell_type) &&
                 !is_empty_cell(&(env.cell[x][y])) &&
                 handle_collision(missile_type, &(env.cell[x][y])))
             {
@@ -274,11 +346,11 @@ static int handle_collisions_around_missile(missile_t *missile, int span)
 static void update_missile_cell(missile_t *missile)
 {
     int x, y;
-    cell_type type;
+    cell_type_t type;
 
     x = missile->x;
     y = missile->y;
-    type = missile->missile_type == ATTACKER ? ATK_MISSILE : DEF_MISSILE;
+    type = missile_to_cell_type(missile->missile_type);
 
     env.cell[x][y].value = missile->index;
     env.cell[x][y].type = type;
@@ -287,8 +359,6 @@ static void update_missile_cell(missile_t *missile)
 int update_missile_position(missile_t *missile, int oldx, int oldy)
 {
     int collided;
-
-    sem_wait(&env.mutex);
 
     init_cell_empty(&(env.cell[oldx][oldy]));
 
@@ -299,8 +369,6 @@ int update_missile_position(missile_t *missile, int oldx, int oldy)
         update_missile_cell(missile);
     }
 
-    sem_post(&env.mutex);
-
     return collided;
 }
 
@@ -308,18 +376,79 @@ int update_missile_env(missile_t *missile, int oldx, int oldy)
 {
     int collided;
 
-    sem_wait(&missile->mutex);
+    access_env(MIDDLE_ENV_PRIO);
 
     if (missile->deleted)
     {
-        sem_post(&missile->mutex);
-        return 1;
+        collided = 1;
+    }
+    else
+    {
+        collided = update_missile_position(missile, oldx, oldy);
     }
 
-    collided = update_missile_position(missile, oldx, oldy);
-    sem_post(&missile->mutex);
+    release_env(MIDDLE_ENV_PRIO);
 
     return collided;
+}
+
+pos_t scan_env_for_target_pos(int target)
+{
+    pos_t pos;
+
+    access_env(LOW_ENV_PRIO);
+
+    for (pos.x = 0; pos.x < XWIN; pos.x++)
+    {
+        for (pos.y = 0; pos.y < YWIN; pos.y++)
+        {
+            if (env.cell[pos.x][pos.y].value == target)
+            {
+                sem_post(&env.mutex);
+                return pos;
+            }
+        }
+    }
+
+    release_env(LOW_ENV_PRIO);
+
+    pos.x = -1;
+    pos.y = -1;
+    return pos;
+}
+
+int check_pixel(int x, int y)
+{
+    if (getpixel(screen, x, y) == ATTACKER_COLOR)
+    {
+        return !is_already_tracked(env.cell[x][y].value);
+    }
+
+    return 0;
+}
+
+int search_screen_for_target()
+{
+    int x, y, target;
+
+    access_env(LOW_ENV_PRIO);
+
+    for (y = 0; y < YWIN; y++)
+    {
+        for (x = 0; x < XWIN; x++)
+        {
+            if (check_pixel(x, y))
+            {
+                target = env.cell[x][y].value;
+                sem_post(&env.mutex);
+                return target;
+            }
+        }
+    }
+
+    release_env(LOW_ENV_PRIO);
+
+    return -1;
 }
 
 /**
@@ -368,32 +497,59 @@ static void draw_labels(BITMAP *buffer, int atk_p, int def_p)
     draw_legends(buffer);
 }
 
-static void draw_wall(int x, int y, BITMAP *buffer)
+static void draw_missile(BITMAP *buffer, pos_t pos, missile_type_t type)
 {
-    putpixel(buffer, x, y, WALL_COLOR);
+    int color;
+
+    if (!check_borders(pos.x, pos.y))
+    {
+        return;
+    }
+
+    if (type == ATTACKER)
+    {
+        color = ATTACKER_COLOR;
+    }
+    else
+    {
+        color = DEFENDER_COLOR;
+    }
+
+    circlefill(buffer, pos.x, pos.y, MISSILE_RADIUS, color);
+
+    return;
 }
 
-static void draw_goal(int x, int y, BITMAP *buffer)
+static void draw_wall(pos_t pos, BITMAP *buffer)
 {
-    putpixel(buffer, x, y, GOAL_COLOR);
+    putpixel(buffer, pos.x, pos.y, WALL_COLOR);
+}
+
+static void draw_goal(pos_t pos, BITMAP *buffer)
+{
+    putpixel(buffer, pos.x, pos.y, GOAL_COLOR);
 }
 
 static void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
 {
     missile_type_t m_type;
+    pos_t pos;
+
+    pos.x = x;
+    pos.y = y;
 
     if (is_missile_cell(cell))
     {
         m_type = cell->type == ATK_MISSILE ? ATTACKER : DEFENDER;
-        draw_missile(buffer, x, y, m_type);
+        draw_missile(buffer, pos, m_type);
     }
     else if (is_wall_cell(cell))
     {
-        draw_wall(x, y, buffer);
+        draw_wall(pos, buffer);
     }
     else if (is_goal_cell(cell))
     {
-        draw_goal(x, y, buffer);
+        draw_goal(pos, buffer);
     }
 }
 
@@ -401,7 +557,7 @@ void draw_env()
 {
     int x, y;
 
-    sem_wait(&env.mutex);
+    access_env(HIGH_ENV_PRIO);
 
     for (x = 0; x < XWIN; x++)
     {
@@ -416,20 +572,16 @@ void draw_env()
 
     draw_labels(buffer, env.atk_points, env.def_points);
 
-    sem_post(&env.mutex);
+    release_env(HIGH_ENV_PRIO);
 }
 
 static void draw_buffer_to_screen()
 {
-    sem_wait(&env.mutex);
-
     blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
-
-    sem_post(&env.mutex);
 }
 
 /**
- * THREAD MANAGERS
+ * DISPLAY THREAD
  */
 
 static ptask display_manager(void)

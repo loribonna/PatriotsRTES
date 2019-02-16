@@ -1,6 +1,7 @@
 #ifndef GESTOR_H
 #define GESTOR_H
 
+#include <stdlib.h>
 #include <allegro.h>
 #include <semaphore.h>
 #include "ptask.h"
@@ -23,10 +24,12 @@
 #define WALL_COLOR 6
 #define GOAL_COLOR 10
 #define LABEL_COLOR 14
+#define ATTACKER_COLOR 4
+#define DEFENDER_COLOR 11
 
 #define LABEL_LEN 30
 #define RECT_H 8
-#define RECT_W ((int)(((float)RECT_H/(float)YWIN)*(float)XWIN))
+#define RECT_W ((int)(((float)RECT_H / (float)YWIN) * (float)XWIN))
 #define LEGEND_X (XWIN - 120)
 #define LEGEND_Y 10
 #define LABEL_Y 10
@@ -41,7 +44,13 @@
 #define M_PI 3.14159265358979323846
 #define DELTA_FACTOR 1000
 
-typedef struct {
+#define ENV_PRIOS 3
+#define LOW_ENV_PRIO 2
+#define MIDDLE_ENV_PRIO 1
+#define HIGH_ENV_PRIO 0
+
+typedef struct
+{
     int atk_hit;
     int def_hit;
     sem_t mutex;
@@ -54,18 +63,25 @@ typedef enum
     EMPTY,
     ATK_MISSILE,
     DEF_MISSILE
-} cell_type;
+} cell_type_t;
 
 typedef struct
 {
-    cell_type type;
+    cell_type_t type;
     int value;
 } cell_t;
 
 typedef struct
 {
+    int x;
+    int y;
+} pos_t;
+
+typedef struct
+{
     cell_t cell[XWIN][YWIN];
     int def_points, atk_points;
+    private_sem_t prio_sem[ENV_PRIOS];
     sem_t mutex;
 } env_t;
 
@@ -84,5 +100,13 @@ int update_missile_env(missile_t *missile, int oldx, int oldy);
 void launch_display_manager();
 
 int check_borders(int x, int y);
+
+int search_screen_for_target();
+
+pos_t scan_env_for_target_pos(int target);
+
+void init_empty_pos(pos_t *pos);
+
+int is_valid_pos(pos_t *pos);
 
 #endif

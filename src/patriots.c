@@ -9,13 +9,14 @@ void init()
 
     init_launchers();
 
-    ptask_init(SCHED_FIFO, 1, 2);
+    ptask_init(SCHED_FIFO, GLOBAL, NO_PROTOCOL);
 }
 
 void spawn_tasks()
 {
     launch_display_manager();
 
+    launch_def_launcher();
     launch_atk_launcher();
 }
 
@@ -36,7 +37,7 @@ int main(void)
             k = c >> 8;
             if (k == KEY_SPACE)
             {
-                request_atk_launch(&atk_gestor.gestor);
+                request_atk_launch();
             }
         }
 
