@@ -341,7 +341,7 @@ static void set_random_start(missile_t *missile)
     missile->x = (int)missile->partial_x;
     missile->y = (int)missile->partial_y;
 
-    fprintf(stderr, "Created atk %i with speed %f\n",
+    fprintf(stderr, "ATK: Created %i with speed %f\n",
             missile->index, missile->speed);
 }
 
@@ -488,8 +488,6 @@ static float get_expected_position_x(trajectory_t *t, pos_t *current)
                          : tmp_dsa < dsa ? x : x_max;
     } while (fabs(tmp_dsa - dsa) > EPSILON && ++i < SAMPLE_LIMIT);
 
-    fprintf(stderr, "Starting X: %f\n", x);
-
     return x;
 }
 
@@ -551,7 +549,7 @@ static float get_start_x_position(int target)
         trajectory.b = get_line_b_with_m(trajectory.m, &pos_a);
         trajectory.speed = calc_speed(&pos_a, &pos_b, dt);
 
-        fprintf(stderr, "Calculated speed for target %i: %f\n",
+        fprintf(stderr, "DEF: Calculated speed for target %i: %f\n",
                 target, trajectory.speed);
 
         return get_expected_position_x(&trajectory, &pos_b);
@@ -575,6 +573,8 @@ ptask def_thread()
     task_index = ptask_get_index();
     self = ptask_get_argument();
 
+    fprintf(stderr, "DEF: Calculating %i target %i\n",
+            self->index, self->target);
     start_x = get_start_x_position(self->target);
     set_missile_trajectory(self, start_x);
 
@@ -631,7 +631,7 @@ ptask def_launcher()
 
         if (target >= 0)
         {
-            fprintf(stderr, "Target %i\n", target);
+            fprintf(stderr, "DEF_LAUNCHER: Found target %i\n", target);
             index = request_def_launch();
             launch_def_missile(index, target);
             def_wait();
