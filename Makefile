@@ -21,7 +21,7 @@ INCLUDE = -I./include
 CC = gcc
 # Options to the compiler
 CFLAGS = -Wall -lrt -lm
-ALL_FLAGE = $(INCLUDE) $(CFLAGS)
+ALL_FLAGS = $(INCLUDE) $(CFLAGS)
 
 # Libraries
 LIB_ALLEGRO = -lpthread `allegro-config --libs`
@@ -40,10 +40,10 @@ build: compile link
 
 compile: $(SOURCE_FILES)
 	$(foreach f, $^, \
-		$(CC) -g -c $f -o $(OUT_BUILD)/$(basename $(notdir $f)).o $(CFLAGS);)
+		$(CC) -g -c $f -o $(OUT_BUILD)/$(basename $(notdir $f)).o $(ALL_FLAGS);)
 
 link: $(OUT_FILES)
-	$(CC) -o $(OUT_BUILD)/$(MAIN) $(OUT_FILES) $(LIBS) $(CFLAGS)
+	$(CC) -o $(OUT_BUILD)/$(MAIN) $(OUT_FILES) $(LIBS) $(ALL_FLAGS)
 
 # ---------------------
 # SECTION: CLEAN
