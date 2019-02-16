@@ -38,7 +38,7 @@
 
 #define get_y_label(s) (YWIN - s * LABEL_Y)
 
-#define DISPLAY_PERIOD 10
+#define DISPLAY_PERIOD 20
 #define DISPLAY_PRIO 3
 
 #define M_PI 3.14159265358979323846
@@ -81,6 +81,7 @@ typedef struct
 {
     cell_t cell[XWIN][YWIN];
     int def_points, atk_points;
+    int count;
     private_sem_t prio_sem[ENV_PRIOS];
     sem_t mutex;
 } env_t;
