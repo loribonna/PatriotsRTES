@@ -4,16 +4,19 @@
 #include <stdlib.h>
 #include "ptask.h"
 
+// Precision used in trajectory calculation (percentual)
+#define TRAJECTORY_PRECISION 10
+
 #define MAX_ATK_SPEED 100
 #define MIN_ATK_SPEED ((int)(MAX_ATK_SPEED * 0.3))
 #define MAX_ATK_ANGLE 30
 #define ATK_SLEEP_DELAY 500 * 1000 * 1000 // 500 milliseconds
 
-#define ATK_LAUNCHER_PERIOD 40
+#define ATK_LAUNCHER_PERIOD 60
 #define ATK_LAUNCHER_PRIO 1
 
 #define ATK_MISSILE_PRIO 2
-#define ATK_MISSILE_PERIOD 20
+#define ATK_MISSILE_PERIOD 30
 
 #define DEF_SLEEP_DELAY 50 * 1000 * 1000 // 50 milliseconds
 
@@ -21,7 +24,7 @@
 #define DEF_LAUNCHER_PRIO 1
 
 #define DEF_MISSILE_PRIO 2
-#define DEF_MISSILE_PERIOD 20
+#define DEF_MISSILE_PERIOD 30
 
 #define MISSILE_RADIUS 5
 #define DEF_MISSILE_START_Y (GOAL_START_Y - MISSILE_RADIUS - 1)
@@ -30,9 +33,9 @@
 #define WAIT_UPDATE 0
 #define UPDATED 1
 
-#define SAMPLE_LIMIT 50
-#define MIN_SAMPLES 5
-#define EPSILON 0.01
+#define SAMPLE_LIMIT (2 * TRAJECTORY_PRECISION)
+#define MIN_SAMPLES (SAMPLE_LIMIT / 5)
+#define EPSILON (1 / TRAJECTORY_PRECISION)
 #define N 4
 
 typedef enum

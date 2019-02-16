@@ -93,6 +93,8 @@ static void init_env()
         init_private_sem(&(env.prio_sem[i]));
     }
 
+    env.count = 0;
+
     sem_init(&env.mutex, 0, 1);
 }
 
@@ -185,18 +187,17 @@ static void access_env(int prio)
 
     for (p = prio; p >= 0; p--)
     {
-        lock |= env.prio_sem[p].count ||
-                env.prio_sem[p].blk;
+        lock |= env.prio_sem[p].blk;
     }
 
-    if (lock)
+    if (env.count || lock)
     {
         env.prio_sem[prio].blk++;
         sem_post(&env.mutex);
         sem_wait(&(env.prio_sem[prio].sem));
         env.prio_sem[prio].blk--;
     }
-    env.prio_sem[prio].count++;
+    env.count++;
 
     sem_post(&env.mutex);
 }
@@ -207,7 +208,7 @@ static void release_env(int prio)
 
     sem_wait(&env.mutex);
 
-    env.prio_sem[prio].count--;
+    env.count--;
 
     next_prio = prio;
     do
@@ -245,10 +246,6 @@ static cell_type_t handle_collision_by_cell_type(cell_t *cell)
 
     switch (type)
     {
-    case WALL:
-        break;
-    case GOAL:
-        break;
     case DEF_MISSILE:
         delete_def_missile(cell->value);
         init_cell_empty(cell);
@@ -394,7 +391,7 @@ pos_t scan_env_for_target_pos(int target)
         {
             if (env.cell[pos.x][pos.y].target == target)
             {
-                sem_post(&env.mutex);
+                release_env(LOW_ENV_PRIO);
                 return pos;
             }
         }
@@ -434,7 +431,7 @@ int search_screen_for_target(int t_assign)
             {
                 assign_target_to_atk(env.cell[x][y].value, t_assign);
                 env.cell[x][y].target = t_assign;
-                sem_post(&env.mutex);
+                release_env(LOW_ENV_PRIO);
                 return 1;
             }
         }
@@ -603,5 +600,6 @@ void launch_display_manager()
 
     assert(task >= 0);
 
-    fprintf(stderr, "Created DISPLAY manager\n");
+    fprintf(stderr, "Created DISPLAY manager with period: %i\n",
+            DISPLAY_PERIOD);
 }
