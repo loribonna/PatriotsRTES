@@ -39,7 +39,7 @@
 #define get_y_label(s) (YWIN - s * LABEL_Y)
 
 #define DISPLAY_PERIOD 10
-#define DISPLAY_PRIO 5
+#define DISPLAY_PRIO 3
 
 #define M_PI 3.14159265358979323846
 #define DELTA_FACTOR 1000

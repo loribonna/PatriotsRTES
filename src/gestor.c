@@ -178,25 +178,15 @@ static int is_goal_cell(cell_t *cell)
 
 static void access_env(int prio)
 {
-    int lock;
+    int lock, p;
 
     sem_wait(&env.mutex);
+    lock = 0;
 
-    switch (prio)
+    for (p = prio; p >= 0; p--)
     {
-    case 0:
-        lock = env.prio_sem[0].count ||
-               env.prio_sem[0].blk;
-        break;
-    case 1:
-        lock = env.prio_sem[0].count ||
-               env.prio_sem[0].blk ||
-               env.prio_sem[1].count ||
-               env.prio_sem[1].blk;
-        break;
-    default:
-        lock = 0;
-        break;
+        lock |= env.prio_sem[p].count ||
+                env.prio_sem[p].blk;
     }
 
     if (lock)
@@ -218,20 +208,19 @@ static void release_env(int prio)
     sem_wait(&env.mutex);
 
     env.prio_sem[prio].count--;
-    next_prio = (prio + 1) % ENV_PRIOS;
 
-    if (env.prio_sem[next_prio].blk)
+    next_prio = prio;
+    do
     {
-        sem_post(&(env.prio_sem[next_prio].sem));
-    }
-    else if (env.prio_sem[prio].blk)
-    {
-        sem_post(&(env.prio_sem[prio].sem));
-    }
-    else
-    {
-        sem_post(&env.mutex);
-    }
+        next_prio = (next_prio + 1) % ENV_PRIOS;
+        if (env.prio_sem[next_prio].blk)
+        {
+            sem_post(&(env.prio_sem[next_prio].sem));
+            return;
+        }
+    } while (next_prio != prio);
+
+    sem_post(&env.mutex);
 }
 
 /**
