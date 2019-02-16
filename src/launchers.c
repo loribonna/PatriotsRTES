@@ -113,7 +113,7 @@ void request_atk_launch()
     }
 }
 
-int request_def_launch()
+int request_def_index()
 {
     int index;
     fifo_queue_gestor_t *gestor;
@@ -258,16 +258,6 @@ static void task_missile_movement(missile_t *missile, int task_index)
  * ATTACK THREADS
  */
 
-static pos_t get_target_pos(int target)
-{
-    return scan_env_for_target_pos(target);
-}
-
-void clear_atk_missile(missile_t *missile)
-{
-    clear_missile(missile, &atk_gestor.gestor);
-}
-
 ptask atk_thread(void)
 {
     missile_t *self;
@@ -278,7 +268,7 @@ ptask atk_thread(void)
 
     task_missile_movement(self, task_index);
 
-    clear_atk_missile(self);
+    clear_missile(self, &atk_gestor.gestor);
 }
 
 static int launch_atk_thread(missile_t *missile)
@@ -391,21 +381,12 @@ int is_already_tracked(int target)
 
     ret = 0;
 
-    sem_wait(&def_gestor.gestor.mutex);
-
     for (i = 0; i < N; i++)
     {
         ret |= def_gestor.queue[i].index == target;
     }
 
-    sem_post(&def_gestor.gestor.mutex);
-
     return ret;
-}
-
-void clear_def_missile(missile_t *missile)
-{
-    clear_missile(missile, &def_gestor.gestor);
 }
 
 static float get_pos_distance(pos_t *pos_a, pos_t *pos_b)
@@ -437,7 +418,10 @@ static float get_y_from_trajectory(trajectory_t *t, float x)
     return t->m * x + t->b;
 }
 
-static float get_expected_position_x(trajectory_t *t, pos_t *current)
+// Calculate expected intercept between target trajectory (t)
+// given its last known position (current).
+// Solved by using Bisection method.
+static int get_expected_position_x(trajectory_t *t, pos_t *current)
 {
     float x, y, dsa, dsb, tmp_dsa, x_min, x_max;
     int i;
@@ -462,35 +446,35 @@ static float get_expected_position_x(trajectory_t *t, pos_t *current)
         i++;
     } while (fabs(tmp_dsa - dsa) > EPSILON && i < SAMPLE_LIMIT);
 
-    return x;
+    return (int)x;
 }
 
-static float calc_speed(pos_t *pos_a, pos_t *pos_b, double t_time)
+static float calc_speed(pos_t *pos_a, pos_t *pos_b, float t_time)
 {
     assert(t_time > 0);
-    return (float)(get_pos_distance(pos_a, pos_b) / t_time);
+    return get_pos_distance(pos_a, pos_b) / t_time;
 }
 
-static double calc_dt(struct timespec t_start, struct timespec t_end)
+static float calc_dt(struct timespec t_start, struct timespec t_end)
 {
-    return (double)(t_end.tv_sec - t_start.tv_sec) +
+    return (float)(t_end.tv_sec - t_start.tv_sec) +
            (t_end.tv_nsec - t_start.tv_nsec) / 1000000000.0;
 }
 
-static void collect_positions(pos_t *pos_a, pos_t *pos_b, const int trgt, double *dt)
+static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trgt, float *dt)
 {
     struct timespec t_start, t_end;
     float speed_a, speed_b;
     int i;
 
     clock_gettime(CLOCK_MONOTONIC, &t_start);
-    *pos_a = get_target_pos(trgt);
+    *pos_a = scan_env_for_target_pos(trgt);
     speed_b = i = 0;
 
     do
     {
         speed_a = speed_b;
-        *pos_b = get_target_pos(trgt);
+        *pos_b = scan_env_for_target_pos(trgt);
 
         clock_gettime(CLOCK_MONOTONIC, &t_end);
         *dt = calc_dt(t_start, t_end);
@@ -498,14 +482,15 @@ static void collect_positions(pos_t *pos_a, pos_t *pos_b, const int trgt, double
 
         ptask_wait_for_period();
         i++;
-    } while ((fabs(speed_b - speed_a) > EPSILON || i < MIN_SAMPLES) &&
-             i < SAMPLE_LIMIT);
+    } while (i < SAMPLE_LIMIT &&
+             (fabs(speed_b - speed_a) > EPSILON ||
+              i < MIN_SAMPLES || speed_b == 0));
 }
 
-static float get_start_x_position(int target)
+static int get_start_x_position(int target)
 {
     trajectory_t trajectory;
-    double dt;
+    float dt;
     pos_t pos_a, pos_b;
 
     collect_positions(&pos_a, &pos_b, target, &dt);
@@ -548,8 +533,8 @@ ptask def_thread()
     set_missile_trajectory(self, start_x);
 
     task_missile_movement(self, task_index);
-    
-    clear_def_missile(self);
+
+    clear_missile(self, &def_gestor.gestor);
 }
 
 static void init_def_params(tpars *params, void *arg)
@@ -593,13 +578,14 @@ ptask def_launcher()
 {
     int index;
 
-    index = request_def_launch();
+    index = request_def_index();
     do
     {
-        index = index >= 0 ? index : request_def_launch();
+        index = index >= 0 ? index : request_def_index();
         if (search_screen_for_target(index))
         {
-            fprintf(stderr, "DEF_LAUNCHER: Found and assign %i\n", index);
+            fprintf(stderr, "DEF_LAUNCHER: Found target and assigned %i\n",
+                    index);
             launch_def_missile(index);
             index = -1;
             def_wait();

@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include "ptask.h"
 
+// Precision used in trajectory calculation (percentual)
+#define TRAJECTORY_PRECISION 10
+
 #define MAX_ATK_SPEED 100
 #define MIN_ATK_SPEED ((int)(MAX_ATK_SPEED * 0.3))
 #define MAX_ATK_ANGLE 30
@@ -30,9 +33,9 @@
 #define WAIT_UPDATE 0
 #define UPDATED 1
 
-#define SAMPLE_LIMIT 50
-#define MIN_SAMPLES 5
-#define EPSILON 0.01
+#define SAMPLE_LIMIT (2 * TRAJECTORY_PRECISION)
+#define MIN_SAMPLES (SAMPLE_LIMIT / 5)
+#define EPSILON (1 / TRAJECTORY_PRECISION)
 #define N 4
 
 typedef enum

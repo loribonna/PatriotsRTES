@@ -246,10 +246,6 @@ static cell_type_t handle_collision_by_cell_type(cell_t *cell)
 
     switch (type)
     {
-    case WALL:
-        break;
-    case GOAL:
-        break;
     case DEF_MISSILE:
         delete_def_missile(cell->value);
         init_cell_empty(cell);
