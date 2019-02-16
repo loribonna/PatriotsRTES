@@ -106,6 +106,11 @@ void init_gestor()
  * COMMON FUNCTIONS
  */
 
+cell_type_t missile_to_cell_type(missile_type_t m_type)
+{
+    return m_type == ATTACKER ? ATK_MISSILE : DEF_MISSILE;
+}
+
 void init_empty_pos(pos_t *pos)
 {
     pos->x = pos->y = -1;
@@ -243,9 +248,9 @@ static void atk_point()
     env.atk_points++;
 }
 
-static cell_type handle_collision_by_cell_type(cell_t *cell)
+static cell_type_t handle_collision_by_cell_type(cell_t *cell)
 {
-    cell_type type;
+    cell_type_t type;
 
     type = cell->type;
 
@@ -272,7 +277,7 @@ static cell_type handle_collision_by_cell_type(cell_t *cell)
 
 static int handle_collision(missile_type_t missile_type, cell_t *cell)
 {
-    cell_type type;
+    cell_type_t type;
 
     type = handle_collision_by_cell_type(cell);
 
@@ -299,14 +304,17 @@ static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
 {
     int x, y;
     missile_type_t missile_type;
+    cell_type_t cell_type;
 
     missile_type = missile->missile_type;
+    cell_type = missile_to_cell_type(missile_type);
 
     for (x = xa; x < xb; x++)
     {
         for (y = ya; y < yb; y++)
         {
-            if (env.cell[x][y].value != missile->index &&
+            if ((env.cell[x][y].value != missile->index ||
+                 env.cell[x][y].type != cell_type) &&
                 !is_empty_cell(&(env.cell[x][y])) &&
                 handle_collision(missile_type, &(env.cell[x][y])))
             {
@@ -338,11 +346,11 @@ static int handle_collisions_around_missile(missile_t *missile, int span)
 static void update_missile_cell(missile_t *missile)
 {
     int x, y;
-    cell_type type;
+    cell_type_t type;
 
     x = missile->x;
     y = missile->y;
-    type = missile->missile_type == ATTACKER ? ATK_MISSILE : DEF_MISSILE;
+    type = missile_to_cell_type(missile->missile_type);
 
     env.cell[x][y].value = missile->index;
     env.cell[x][y].type = type;
@@ -382,6 +390,65 @@ int update_missile_env(missile_t *missile, int oldx, int oldy)
     release_env(MIDDLE_ENV_PRIO);
 
     return collided;
+}
+
+pos_t scan_env_for_target_pos(int target)
+{
+    pos_t pos;
+
+    access_env(LOW_ENV_PRIO);
+
+    for (pos.x = 0; pos.x < XWIN; pos.x++)
+    {
+        for (pos.y = 0; pos.y < YWIN; pos.y++)
+        {
+            if (env.cell[pos.x][pos.y].value == target)
+            {
+                sem_post(&env.mutex);
+                return pos;
+            }
+        }
+    }
+
+    release_env(LOW_ENV_PRIO);
+
+    pos.x = -1;
+    pos.y = -1;
+    return pos;
+}
+
+int check_pixel(int x, int y)
+{
+    if (getpixel(screen, x, y) == ATTACKER_COLOR)
+    {
+        return !is_already_tracked(env.cell[x][y].value);
+    }
+
+    return 0;
+}
+
+int search_screen_for_target()
+{
+    int x, y, target;
+
+    access_env(LOW_ENV_PRIO);
+
+    for (y = 0; y < YWIN; y++)
+    {
+        for (x = 0; x < XWIN; x++)
+        {
+            if (check_pixel(x, y))
+            {
+                target = env.cell[x][y].value;
+                sem_post(&env.mutex);
+                return target;
+            }
+        }
+    }
+
+    release_env(LOW_ENV_PRIO);
+
+    return -1;
 }
 
 /**
@@ -516,65 +583,6 @@ static void draw_buffer_to_screen()
 /**
  * DISPLAY THREAD
  */
-
-pos_t scan_env_for_target_pos(int target)
-{
-    pos_t pos;
-
-    access_env(LOW_ENV_PRIO);
-
-    for (pos.x = 0; pos.x < XWIN; pos.x++)
-    {
-        for (pos.y = 0; pos.y < YWIN; pos.y++)
-        {
-            if (env.cell[pos.x][pos.y].value == target)
-            {
-                sem_post(&env.mutex);
-                return pos;
-            }
-        }
-    }
-
-    release_env(LOW_ENV_PRIO);
-
-    pos.x = -1;
-    pos.y = -1;
-    return pos;
-}
-
-int check_pixel(int x, int y)
-{
-    if (getpixel(screen, x, y) == ATTACKER_COLOR)
-    {
-        return !is_already_tracked(env.cell[x][y].value);
-    }
-
-    return 0;
-}
-
-int search_screen_for_target()
-{
-    int x, y, target;
-
-    access_env(LOW_ENV_PRIO);
-
-    for (y = 0; y < YWIN; y++)
-    {
-        for (x = 0; x < XWIN; x++)
-        {
-            if (check_pixel(x, y))
-            {
-                target = env.cell[x][y].value;
-                sem_post(&env.mutex);
-                return target;
-            }
-        }
-    }
-
-    release_env(LOW_ENV_PRIO);
-
-    return -1;
-}
 
 static ptask display_manager(void)
 {

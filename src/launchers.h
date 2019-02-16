@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include "ptask.h"
 
-#define MAX_SPEED 100
-#define MAX_ANGLE 30
+#define MAX_ATK_SPEED 100
+#define MIN_ATK_SPEED ((int)(MAX_ATK_SPEED * 0.3))
+#define MAX_ATK_ANGLE 30
 #define ATK_SLEEP_DELAY 500 * 1000 * 1000 // 500 milliseconds
 
 #define ATK_LAUNCHER_PERIOD 40

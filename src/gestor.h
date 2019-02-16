@@ -63,11 +63,11 @@ typedef enum
     EMPTY,
     ATK_MISSILE,
     DEF_MISSILE
-} cell_type;
+} cell_type_t;
 
 typedef struct
 {
-    cell_type type;
+    cell_type_t type;
     int value;
 } cell_t;
 

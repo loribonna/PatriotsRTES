@@ -164,8 +164,6 @@ static int get_next_index(fifo_queue_gestor_t *gestor)
 
 static void splice_index(fifo_queue_gestor_t *gestor, int index)
 {
-    sem_wait(&(gestor->mutex));
-
     assert(index >= 0);
 
     gestor->next[index] = gestor->freeIndex;
@@ -196,12 +194,18 @@ static void init_atk_params(tpars *params, void *arg)
 
 void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
 {
+    sem_wait(&gestor->mutex);
     if (!missile->cleared)
     {
         missile->cleared = 1;
         missile->speed = 0;
+        missile->target = -1;
 
         splice_index(gestor, missile->index);
+    }
+    else
+    {
+        sem_post(&gestor->mutex);
     }
 }
 
@@ -331,13 +335,14 @@ static void set_random_start(missile_t *missile)
     missile->partial_x = (int)frand(0, XWIN);
     missile->partial_y = WALL_THICKNESS + MISSILE_RADIUS + 1;
 
-    missile->speed = frand(1, MAX_SPEED);
-    missile->angle = frand(MAX_ANGLE, 180 - MAX_ANGLE);
+    missile->speed = frand(MIN_ATK_SPEED, MAX_ATK_SPEED);
+    missile->angle = frand(MAX_ATK_ANGLE, 180 - MAX_ATK_ANGLE);
 
     missile->x = (int)missile->partial_x;
     missile->y = (int)missile->partial_y;
 
-    fprintf(stderr, "Created atk with speed %f\n", missile->speed);
+    fprintf(stderr, "Created atk %i with speed %f\n",
+            missile->index, missile->speed);
 }
 
 static void init_atk_missile(missile_t *missile, int index)
@@ -465,8 +470,8 @@ static float get_expected_position_x(trajectory_t *t, pos_t *current)
     int i;
 
     i = 0;
-    x_min = t->m < 0 ? 0 : current->x;
-    x_max = t->m < 0 ? current->x : XWIN;
+    x_min = t->m < 0 ? WALL_THICKNESS + MISSILE_RADIUS + 1 : current->x;
+    x_max = t->m < 0 ? current->x : XWIN - WALL_THICKNESS - MISSILE_RADIUS - 1;
 
     do
     {
@@ -477,11 +482,13 @@ static float get_expected_position_x(trajectory_t *t, pos_t *current)
         dsa = sqrt(pow(y - current->y, 2) + pow(x - current->x, 2));
         tmp_dsa = (t->speed / DEF_MISSILE_SPEED) * dsb;
 
-        x_min = tmp_dsa < dsa ? x : x_min;
-        x_max = tmp_dsa > dsa ? x : x_max;
+        x_min = t->m < 0 ? tmp_dsa < dsa ? x : x_min
+                         : tmp_dsa > dsa ? x : x_min;
+        x_max = t->m < 0 ? tmp_dsa > dsa ? x : x_max
+                         : tmp_dsa < dsa ? x : x_max;
     } while (fabs(tmp_dsa - dsa) > EPSILON && ++i < SAMPLE_LIMIT);
 
-    fprintf(stderr, "%f %f %f %i\n", dsa, dsb, x, i);
+    fprintf(stderr, "Starting X: %f\n", x);
 
     return x;
 }
@@ -622,7 +629,7 @@ ptask def_launcher()
     {
         target = search_screen_for_target();
 
-        if (target != -1)
+        if (target >= 0)
         {
             fprintf(stderr, "Target %i\n", target);
             index = request_def_launch();
