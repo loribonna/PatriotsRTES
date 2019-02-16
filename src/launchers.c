@@ -40,7 +40,7 @@ static void init_empty_missile(missile_t *missile)
     missile->deleted = missile->cleared = 0;
     missile->speed = missile->angle = 0;
     missile->x = missile->y = 0;
-    missile->target = missile->index = -1;
+    missile->assigned_target = missile->index = -1;
 }
 
 static void init_missiles_gestor(missile_gestor_t *m_gestor)
@@ -183,6 +183,29 @@ static void splice_index(fifo_queue_gestor_t *gestor, int index)
  * MISSILE FUNCTIONS
  */
 
+static missile_t *find_missile_by_assigned_target(int target)
+{
+    int i;
+
+    for (i = 0; i < N; i++)
+    {
+        if (atk_gestor.queue[i].assigned_target == target)
+        {
+            return &(atk_gestor.queue[i]);
+        }
+    }
+
+    return NULL;
+}
+
+void assign_target_to_atk(int index, int target)
+{
+    missile_t *missile;
+    missile = &(atk_gestor.queue[index]);
+
+    missile->assigned_target = target;
+}
+
 static void init_atk_params(tpars *params, void *arg)
 {
     ptask_param_init(*params);
@@ -194,14 +217,16 @@ static void init_atk_params(tpars *params, void *arg)
 
 void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
 {
+    int index;
+
     sem_wait(&gestor->mutex);
     if (!missile->cleared)
     {
+        index = missile->index;
+        init_empty_missile(missile);
         missile->cleared = 1;
-        missile->speed = 0;
-        missile->target = -1;
 
-        splice_index(gestor, missile->index);
+        splice_index(gestor, index);
     }
     else
     {
@@ -287,7 +312,8 @@ static pos_t get_target_pos(int target)
     missile_t *m_target;
     pos_t pos;
 
-    m_target = &(atk_gestor.queue[target]);
+    m_target = find_missile_by_assigned_target(target);
+    assert(m_target != NULL);
     wait_missile_update(m_target);
 
     pos = scan_env_for_target_pos(target);
@@ -416,13 +442,18 @@ int is_already_tracked(int target)
 {
     int i, ret;
 
+    if (target < 0)
+    {
+        return 0;
+    }
+
     ret = 0;
 
     sem_wait(&def_gestor.gestor.mutex);
 
     for (i = 0; i < N; i++)
     {
-        ret |= def_gestor.queue[i].target == target;
+        ret |= def_gestor.queue[i].index == target;
     }
 
     sem_post(&def_gestor.gestor.mutex);
@@ -573,9 +604,9 @@ ptask def_thread()
     task_index = ptask_get_index();
     self = ptask_get_argument();
 
-    fprintf(stderr, "DEF: Calculating %i target %i\n",
-            self->index, self->target);
-    start_x = get_start_x_position(self->target);
+    fprintf(stderr, "DEF: Calculating %i\n",
+            self->index);
+    start_x = get_start_x_position(self->index);
     set_missile_trajectory(self, start_x);
 
     task_missile_movement(self, task_index);
@@ -601,21 +632,20 @@ static int launch_def_thread(missile_t *missile)
     return ptask_create_param(def_thread, &params);
 }
 
-static void init_def_missile(missile_t *missile, int index, int target)
+static void init_def_missile(missile_t *missile, int index)
 {
     init_empty_missile(missile);
     missile->index = index;
-    missile->target = target;
     missile->missile_type = DEFENDER;
 }
 
-static void launch_def_missile(int index, int target)
+static void launch_def_missile(int index)
 {
     missile_t *missile;
     int thread;
 
     missile = &(def_gestor.queue[index]);
-    init_def_missile(missile, index, target);
+    init_def_missile(missile, index);
 
     thread = launch_def_thread(missile);
     assert(thread >= 0);
@@ -623,22 +653,23 @@ static void launch_def_missile(int index, int target)
 
 ptask def_launcher()
 {
-    int index, target;
+    int index;
 
-    while (1)
+    index = request_def_launch();
+    do
     {
-        target = search_screen_for_target();
-
-        if (target >= 0)
+        index = index >= 0 ? index : request_def_launch();
+        if (search_screen_for_target(index))
         {
-            fprintf(stderr, "DEF_LAUNCHER: Found target %i\n", target);
-            index = request_def_launch();
-            launch_def_missile(index, target);
+            fprintf(stderr, "DEF_LAUNCHER: Found and assign %i\n", index);
+            launch_def_missile(index);
+            index = -1;
             def_wait();
         }
 
         ptask_wait_for_period();
-    }
+
+    } while (1);
 }
 
 void launch_def_launcher()

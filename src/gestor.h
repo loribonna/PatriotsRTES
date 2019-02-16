@@ -68,7 +68,7 @@ typedef enum
 typedef struct
 {
     cell_type_t type;
-    int value;
+    int value, target;
 } cell_t;
 
 typedef struct
@@ -101,7 +101,7 @@ void launch_display_manager();
 
 int check_borders(int x, int y);
 
-int search_screen_for_target();
+int search_screen_for_target(int t_assign);
 
 pos_t scan_env_for_target_pos(int target);
 

@@ -54,9 +54,9 @@ typedef struct
     float partial_x, partial_y;
     float angle, speed;
     int index;
-    int target;
     int deleted;
     int cleared;
+    int assigned_target;
     private_sem_t update_sem;
     sem_t mutex;
     missile_type_t missile_type;
@@ -98,9 +98,11 @@ void launch_def_launcher();
 
 void delete_def_missile(int index);
 
-int is_already_tracked(int target);
-
 void init_private_sem(private_sem_t *p_sem);
+
+void assign_target_to_atk(int index, int target);
+
+int is_already_tracked(int target);
 
 #include "gestor.h"
 
