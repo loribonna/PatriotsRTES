@@ -10,17 +10,17 @@
 #define ATK_SLEEP_DELAY 500 * 1000 * 1000 // 500 milliseconds
 
 #define ATK_LAUNCHER_PERIOD 40
-#define ATK_LAUNCHER_PRIO 4
+#define ATK_LAUNCHER_PRIO 1
 
-#define ATK_MISSILE_PRIO 4
+#define ATK_MISSILE_PRIO 2
 #define ATK_MISSILE_PERIOD 20
 
 #define DEF_SLEEP_DELAY 50 * 1000 * 1000 // 50 milliseconds
 
 #define DEF_LAUNCHER_PERIOD 40
-#define DEF_LAUNCHER_PRIO 4
+#define DEF_LAUNCHER_PRIO 1
 
-#define DEF_MISSILE_PRIO 4
+#define DEF_MISSILE_PRIO 2
 #define DEF_MISSILE_PERIOD 20
 
 #define MISSILE_RADIUS 5
@@ -54,10 +54,9 @@ typedef struct
     float partial_x, partial_y;
     float angle, speed;
     int index;
-    int target;
     int deleted;
     int cleared;
-    private_sem_t update_sem;
+    int assigned_target;
     sem_t mutex;
     missile_type_t missile_type;
 } missile_t;
@@ -98,9 +97,11 @@ void launch_def_launcher();
 
 void delete_def_missile(int index);
 
-int is_already_tracked(int target);
-
 void init_private_sem(private_sem_t *p_sem);
+
+void assign_target_to_atk(int index, int target);
+
+int is_already_tracked(int target);
 
 #include "gestor.h"
 
