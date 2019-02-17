@@ -10,10 +10,7 @@
 #ifndef GESTOR_H
 #define GESTOR_H
 
-#include <stdlib.h>
-#include <allegro.h>
 #include <semaphore.h>
-#include "ptask.h"
 #include "launchers.h"
 
 // PI constant used in calculus.

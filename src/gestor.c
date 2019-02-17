@@ -11,10 +11,10 @@
  * 
 ********************************************************************/
 
-
 #include "gestor.h"
-#include <stdlib.h>
 #include <stdio.h>
+#include "ptask.h"
+#include <allegro.h>
 #include <assert.h>
 #include <math.h>
 
@@ -109,6 +109,9 @@ static void init_env()
     sem_init(&env.mutex, 0, 1);
 }
 
+/*
+ * Initialize environment and display manager.
+ */
 void init_gestor()
 {
     init_env();
@@ -355,6 +358,14 @@ static int update_missile_position(missile_t *missile, int oldx, int oldy)
     return collided;
 }
 
+/*
+ * Update missile position in the environment and check for collisions.
+ * 
+ * missile: reference to the missile structure.
+ * oldx: x coordinate of the past position.
+ * oldy: y coordinate of the past position.
+ * ~return: 1 if the given missile collides with something, else 0
+ */
 int update_missile_env(missile_t *missile, int oldx, int oldy)
 {
     int collided;
@@ -375,6 +386,13 @@ int update_missile_env(missile_t *missile, int oldx, int oldy)
     return collided;
 }
 
+/*
+ * Search screen for the <target>'s current position.
+ * 
+ * target: index of the target to search in the screen.
+ * ~return: current position of the target. If the target
+ * was not found, the position returned is (-1, -1).
+ */
 pos_t scan_env_for_target_pos(int target)
 {
     pos_t   pos;
@@ -400,7 +418,7 @@ pos_t scan_env_for_target_pos(int target)
     return pos;
 }
 
-int check_pixel(int x, int y)
+static int check_pixel(int x, int y)
 {
     cell_t  cell = env.cell[x][y];
 
@@ -413,6 +431,13 @@ int check_pixel(int x, int y)
     return 0;
 }
 
+/*
+ * Search screen for a new target (attacker missile) and marks
+ * it as tracked by assigning ad index <t_assign>.
+ * 
+ * t_assign: index to assign to the eventual found target.
+ * ~return: 1 if a target was found, else 0.
+ */
 int search_screen_for_target(int t_assign)
 {
     int x, y;
@@ -588,6 +613,9 @@ static ptask display_manager(void)
     }
 }
 
+/*
+ * Launch display manager task.
+ */
 void launch_display_manager()
 {
     int task;
