@@ -479,11 +479,11 @@ static void draw_labels(BITMAP *buffer, int atk_p, int def_p)
 
     sprintf(s, "Attack points: %i", atk_p);
     textout_ex(buffer, font, s, LABEL_X,
-               get_y_label(1), LABEL_COLOR, BKG_COLOR);
+               GET_Y_LABEL(1), LABEL_COLOR, BKG_COLOR);
 
     sprintf(s, "Defender points: %i", def_p);
     textout_ex(buffer, font, s, LABEL_X,
-               get_y_label(2), LABEL_COLOR, BKG_COLOR);
+               GET_Y_LABEL(2), LABEL_COLOR, BKG_COLOR);
 
     draw_legends(buffer);
 }

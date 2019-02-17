@@ -4,39 +4,62 @@
 #include <stdlib.h>
 #include "ptask.h"
 
-// Precision used in trajectory calculation (percentual)
-#define TRAJECTORY_PRECISION 10
+// Missile radius, used for draw a missile and check collisions.
+#define MISSILE_RADIUS 5
+// Max number of missile threads -> Size of the queue.
+#define N 4
 
+/**
+ * ATTACK PARAMETERS
+ */
+
+// Upper extremity for random attack missile speed.
 #define MAX_ATK_SPEED 100
+// Lower extremity for random attack missile speed.
 #define MIN_ATK_SPEED ((int)(MAX_ATK_SPEED * 0.3))
+// Maximum trajectory angle for random attack missile.
 #define MAX_ATK_ANGLE 30
+// Delay between subsequent attack missile launches.
 #define ATK_SLEEP_DELAY 500 * 1000 * 1000 // 500 milliseconds
 
+// Period of the attack launcher task.
 #define ATK_LAUNCHER_PERIOD 60
+// Priority of the attack launcher task.
 #define ATK_LAUNCHER_PRIO 1
-
+// Priority of the attack missile task.
 #define ATK_MISSILE_PRIO 2
+// Period of the attack missile task.
 #define ATK_MISSILE_PERIOD 30
 
+/**
+ * DEFENDER PARAMETERS
+ */
+
+// Common starting point for defender missiles.
+#define DEF_MISSILE_START_Y (GOAL_START_Y - MISSILE_RADIUS - 1)
+// Fixed defender missile speed.
+#define DEF_MISSILE_SPEED 130
+// Delay between subsequent defender missile launches.
 #define DEF_SLEEP_DELAY 50 * 1000 * 1000 // 50 milliseconds
 
+// Period of the defender launcher task.
 #define DEF_LAUNCHER_PERIOD 40
+// Priority of the defender launcher task.
 #define DEF_LAUNCHER_PRIO 1
-
+// Priority of the defender missile task.
 #define DEF_MISSILE_PRIO 2
+// Period of the defender missile task.
 #define DEF_MISSILE_PERIOD 30
 
-#define MISSILE_RADIUS 5
-#define DEF_MISSILE_START_Y (GOAL_START_Y - MISSILE_RADIUS - 1)
-#define DEF_MISSILE_SPEED 130
-
-#define WAIT_UPDATE 0
-#define UPDATED 1
-
+// Precision used in trajectory calculation (percentual)
+#define TRAJECTORY_PRECISION 10
+// Ubber extremity to limit trajectory calculation loop.
 #define SAMPLE_LIMIT (2 * TRAJECTORY_PRECISION)
+// Minimum number of samples to collect to calculate the trajectory
+// of an attacker missile.
 #define MIN_SAMPLES (SAMPLE_LIMIT / 5)
+// Level of precision used in trajectory calculus.
 #define EPSILON (1 / TRAJECTORY_PRECISION)
-#define N 4
 
 typedef enum
 {
