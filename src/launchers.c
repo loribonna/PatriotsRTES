@@ -1,14 +1,43 @@
+/********************************************************************
+ * Lorenzo Bonicelli 2019
+ * 
+ * This file contains the missile ang launcher management functions 
+ * and tasks.
+ * 
+ * The missiles (attacker or defender) are stored in two separated 
+ * fifo queues, managed by a fifo gestor.
+ * The fifo queue gestor can operate by extracting a new free index 
+ * or by refilling a precedently used one.
+ * 
+ * The attacker launcher waits on the queue for a new index to 
+ * assign to a missile thread, that will be provided from a keyboard
+ * event in the main thread.
+ * The defender launcher takes an index to assign to a new untracked
+ * attacker missile.
+ * The refill operation is done by a missile when it collides with 
+ * something and gets cleaned.
+ * 
+********************************************************************/
+
 #include "launchers.h"
+#include <stdlib.h>
+#include "ptask.h"
 #include <time.h>
 #include <math.h>
+#include "gestor.h"
 
-missile_gestor_t atk_gestor;
-missile_gestor_t def_gestor;
+static missile_gestor_t atk_gestor;
+static missile_gestor_t def_gestor;
 
-/**
+/********************************************************************
  * INITIALZATIONS
- */
+********************************************************************/
 
+/*
+ * Initialize a private semaphore structure.
+ * 
+ * private_sem_t: reference to the private semaphore to initialize.
+ */
 void init_private_sem(private_sem_t *p_sem)
 {
     p_sem->blk = p_sem->count = 0;
@@ -65,17 +94,50 @@ static void init_def_launcher()
     init_missiles_gestor(&def_gestor);
 }
 
+/*
+ * Initialize attacker and defender launchers.
+ */
 void init_launchers()
 {
     init_atk_launcher();
     init_def_launcher();
 }
 
-/**
- * QUEUE MANAGEMENT
- */
+/********************************************************************
+ * COMMON FUNCTIONS
+********************************************************************/
 
-void update_queue_head(fifo_queue_gestor_t *gestor, int index)
+/*
+ * Get deltatime based on current task's period.
+ * 
+ * task_index: index of the task from which get the period.
+ * 
+ */
+static float get_deltatime(int task_index, int unit)
+{
+    return (float)ptask_get_period(task_index, unit) / DELTA_FACTOR;
+}
+
+/*
+ * Get float random number between <min> and <max>.
+
+ * min: lower bound for the generated number.
+ * max: upper bound for the generated number.
+ * ~return: random floating number between the extremes.
+ */
+static float frand(float min, float max)
+{
+    float   r;
+
+    r = rand() / (float)RAND_MAX;
+    return min + (max - min) * r;
+}
+
+/********************************************************************
+ * QUEUE MANAGEMENT
+********************************************************************/
+
+static void update_queue_head(fifo_queue_gestor_t *gestor, int index)
 {
     assert(index >= 0 && gestor->read_sem.blk > 0);
 
@@ -91,9 +153,12 @@ void update_queue_head(fifo_queue_gestor_t *gestor, int index)
     gestor->tailIndex = index;
 }
 
+/*
+ * Request an attacker missile task launch.
+ */
 void request_atk_launch()
 {
-    int index;
+    int                 index;
     fifo_queue_gestor_t *gestor;
 
     gestor = &(atk_gestor.gestor);
@@ -115,7 +180,7 @@ void request_atk_launch()
 
 int request_def_index()
 {
-    int index;
+    int                 index;
     fifo_queue_gestor_t *gestor;
 
     gestor = &(def_gestor.gestor);
@@ -179,13 +244,19 @@ static void splice_index(fifo_queue_gestor_t *gestor, int index)
     }
 }
 
-/**
+/********************************************************************
  * MISSILE FUNCTIONS
- */
+********************************************************************/
 
+/*
+ * Assign a target index to an attacker missile task.
+ * 
+ * index: index of the attacker missile.
+ * target: target index to assign.
+ */
 void assign_target_to_atk(int index, int target)
 {
-    missile_t *missile;
+    missile_t   *missile;
     missile = &(atk_gestor.queue[index]);
 
     missile->assigned_target = target;
@@ -200,7 +271,7 @@ static void init_atk_params(tpars *params, void *arg)
     params->arg = arg;
 }
 
-void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
+static void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
 {
     int index;
 
@@ -220,7 +291,7 @@ void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
 
 static int move_missile(missile_t *missile, float deltatime)
 {
-    float dx, dy, angle_rad;
+    float   dx, dy, angle_rad;
 
     angle_rad = missile->angle * (M_PI / 180);
 
@@ -238,8 +309,8 @@ static int move_missile(missile_t *missile, float deltatime)
 
 static void task_missile_movement(missile_t *missile, int task_index)
 {
-    int oldx, oldy, collided;
-    float deltatime;
+    int     oldx, oldy, collided;
+    float   deltatime;
 
     deltatime = get_deltatime(task_index, MILLI);
 
@@ -252,16 +323,17 @@ static void task_missile_movement(missile_t *missile, int task_index)
         collided = update_missile_env(missile, oldx, oldy);
 
         ptask_wait_for_period();
-    } while (!collided);
+    } while (!collided && !end);
 }
-/**
- * ATTACK THREADS
- */
 
-ptask atk_thread(void)
+/********************************************************************
+ * ATTACK THREADS
+********************************************************************/
+
+static ptask atk_thread(void)
 {
-    missile_t *self;
-    int task_index;
+    missile_t   *self;
+    int         task_index;
 
     task_index = ptask_get_index();
     self = ptask_get_argument();
@@ -273,7 +345,7 @@ ptask atk_thread(void)
 
 static int launch_atk_thread(missile_t *missile)
 {
-    tpars params;
+    tpars   params;
 
     init_atk_params(&params, missile);
 
@@ -313,8 +385,8 @@ static void init_atk_missile(missile_t *missile, int index)
 
 static void launch_atk_missile(int index)
 {
-    missile_t *missile;
-    int thread;
+    missile_t   *missile;
+    int         thread;
 
     missile = &(atk_gestor.queue[index]);
     init_atk_missile(missile, index);
@@ -323,11 +395,11 @@ static void launch_atk_missile(int index)
     assert(thread >= 0);
 }
 
-ptask atk_launcher()
+static ptask atk_launcher()
 {
     int index;
 
-    while (1)
+    while (!end)
     {
         index = get_next_index(&atk_gestor.gestor);
         launch_atk_missile(index);
@@ -336,6 +408,9 @@ ptask atk_launcher()
     }
 }
 
+/*
+ * Launch attack launcher task.
+ */
 void launch_atk_launcher()
 {
     int task;
@@ -350,17 +425,22 @@ void launch_atk_launcher()
     fprintf(stderr, "Created ATK launcher\n");
 }
 
+/*
+ * Delete an attacker missile.
+ * 
+ * index: index of the missile to delete.
+ */
 void delete_atk_missile(int index)
 {
-    missile_t *missile;
+    missile_t   *missile;
 
     missile = &(atk_gestor.queue[index]);
     missile->deleted = 1;
 }
 
-/**
+/********************************************************************
  * DEFENDER THREADS
- */
+********************************************************************/
 
 static void def_wait()
 {
@@ -370,6 +450,13 @@ static void def_wait()
     nanosleep(&t, NULL);
 }
 
+/*
+ * Check if a given target index is already assigned to a 
+ * defender missile task.
+ * 
+ * target: index to check.
+ * ~return: 1 if the given index is already tracked, else 0. 
+ */
 int is_already_tracked(int target)
 {
     int i, ret;
@@ -418,13 +505,15 @@ static float get_y_from_trajectory(trajectory_t *t, float x)
     return t->m * x + t->b;
 }
 
-// Calculate expected intercept between target trajectory (t)
-// given its last known position (current).
-// Solved by using Bisection method.
+/*
+ * Calculate expected intercept between target trajectory (t) given
+ * its last known position (current).
+ * Solved by using Bisection method.
+ */
 static int get_expected_position_x(trajectory_t *t, pos_t *current)
 {
-    float x, y, dsa, dsb, tmp_dsa, x_min, x_max;
-    int i;
+    float   x, y, dsa, dsb, tmp_dsa, x_min, x_max;
+    int     i;
 
     i = 0;
     x_min = t->m < 0 ? WALL_THICKNESS + MISSILE_RADIUS + 1 : current->x;
@@ -489,9 +578,9 @@ static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trgt, float *dt)
 
 static int get_start_x_position(int target)
 {
-    trajectory_t trajectory;
-    float dt;
-    pos_t pos_a, pos_b;
+    trajectory_t    trajectory;
+    float           dt;
+    pos_t           pos_a, pos_b;
 
     collect_positions(&pos_a, &pos_b, target, &dt);
 
@@ -520,11 +609,11 @@ static void set_missile_trajectory(missile_t *missile, float start_x)
     missile->speed = -DEF_MISSILE_SPEED;
 }
 
-ptask def_thread()
+static ptask def_thread()
 {
-    missile_t *self;
-    float start_x;
-    int task_index;
+    missile_t   *self;
+    float       start_x;
+    int         task_index;
 
     task_index = ptask_get_index();
     self = ptask_get_argument();
@@ -548,7 +637,7 @@ static void init_def_params(tpars *params, void *arg)
 
 static int launch_def_thread(missile_t *missile)
 {
-    tpars params;
+    tpars   params;
 
     init_def_params(&params, missile);
 
@@ -564,8 +653,8 @@ static void init_def_missile(missile_t *missile, int index)
 
 static void launch_def_missile(int index)
 {
-    missile_t *missile;
-    int thread;
+    missile_t   *missile;
+    int         thread;
 
     missile = &(def_gestor.queue[index]);
     init_def_missile(missile, index);
@@ -574,7 +663,7 @@ static void launch_def_missile(int index)
     assert(thread >= 0);
 }
 
-ptask def_launcher()
+static ptask def_launcher()
 {
     int index;
 
@@ -593,9 +682,12 @@ ptask def_launcher()
 
         ptask_wait_for_period();
 
-    } while (1);
+    } while (!end);
 }
 
+/*
+ * Launch defender launcher task.
+ */
 void launch_def_launcher()
 {
     int task;
@@ -610,9 +702,14 @@ void launch_def_launcher()
     fprintf(stderr, "Created DEF launcher\n");
 }
 
+/*
+ * Delete an defender missile.
+ * 
+ * index: index of the missile to delete.
+ */
 void delete_def_missile(int index)
 {
-    missile_t *missile;
+    missile_t   *missile;
 
     missile = &(def_gestor.queue[index]);
     missile->deleted = 1;

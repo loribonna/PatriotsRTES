@@ -1,10 +1,20 @@
-#include "patriots.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
 
+#include "patriots.h"
+#include <allegro.h>
+#include "ptask.h"
+#include "launchers.h"
+#include "gestor.h"
+
+// Flag used to end all tasks loops.
+int end;
+
+/*
+ * Initialize all system.
+ */
 void init()
 {
+    end = 0;
+
     init_gestor();
 
     init_launchers();
@@ -12,6 +22,9 @@ void init()
     ptask_init(SCHED_FIFO, GLOBAL, NO_PROTOCOL);
 }
 
+/*
+ * Spawn main tasks: display, defender and attacker launchers.
+ */
 void spawn_tasks()
 {
     launch_display_manager();
@@ -20,6 +33,10 @@ void spawn_tasks()
     launch_atk_launcher();
 }
 
+/*
+ * Main function, responsible to initializing the system, spawning
+ * the main tasks and check for keyboard events.
+ */
 int main(void)
 {
     int c, k;
@@ -43,6 +60,7 @@ int main(void)
 
     } while (k != KEY_ESC);
 
+    end = 1;
     allegro_exit();
     return 0;
 }
