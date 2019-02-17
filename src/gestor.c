@@ -1,16 +1,29 @@
+/********************************************************************
+ * Lorenzo Bonicelli 2019
+ * 
+ * This file contains the environment manager functions and
+ * the display manager functions and task.
+ * 
+ * The only shared structure is "env", which can be accessed by
+ * calling the function "access_env" specifying a priority. 
+ * After an access, the shared structure is released by calling
+ * the function "release_env" with the same priority used to access.
+ * 
+********************************************************************/
+
+
 #include "gestor.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
 
-BITMAP *buffer;
-score_t score;
-env_t env;
+// Global environment used to maintain the status of the system
+static env_t   env;
 
-/**
+/*
  * INITIALZATIONS
- */
+*/
 
 static int goal_init_check(int x, int y)
 {
@@ -25,7 +38,7 @@ static int wall_init_check(int x, int y)
            YWIN - y < WALL_THICKNESS;
 }
 
-static void reset_buffer()
+static void reset_buffer(BITMAP *buffer)
 {
     clear_to_color(buffer, BKG_COLOR);
 }
@@ -70,8 +83,6 @@ static void display_init()
     set_gfx_mode(GFX_AUTODETECT_WINDOWED, XWIN, YWIN, 0, 0);
     clear_to_color(screen, BKG_COLOR);
     install_keyboard();
-
-    buffer = create_bitmap(XWIN, YWIN);
 }
 
 static void init_env()
@@ -104,25 +115,23 @@ void init_gestor()
     display_init();
 }
 
-/**
+/*
  * COMMON FUNCTIONS
- */
+*/
 
-cell_type_t missile_to_cell_type(missile_type_t m_type)
+static cell_type_t missile_to_cell_type(missile_type_t m_type)
 {
     return m_type == ATTACKER ? ATK_MISSILE : DEF_MISSILE;
 }
 
-void init_empty_pos(pos_t *pos)
-{
-    pos->x = pos->y = -1;
-}
-
-int is_valid_pos(pos_t *pos)
-{
-    return pos->x >= 0 && pos->y >= 0;
-}
-
+/*
+ * Check if the given position falls inside window borders.
+ * 
+ * x: x coordinate of the position to check.
+ * y: y coordinate of the position to check.
+ * ~return: 1 if the given position falls inside window
+ * borders, else 0.
+ */
 int check_borders(int x, int y)
 {
     return x < XWIN &&
@@ -131,22 +140,9 @@ int check_borders(int x, int y)
            y >= 0;
 }
 
-float frand(float min, float max)
-{
-    float r;
-
-    r = rand() / (float)RAND_MAX;
-    return min + (max - min) * r;
-}
-
-float get_deltatime(int task_index, int unit)
-{
-    return (float)ptask_get_period(task_index, unit) / DELTA_FACTOR;
-}
-
-/**
+/*
  * CELLS CHECK
- */
+*/
 
 static int is_empty_cell(cell_t *cell)
 {
@@ -174,9 +170,9 @@ static int is_goal_cell(cell_t *cell)
            cell->value == OTHER_CELL;
 }
 
-/**
+/*
  * ENV ACCESS
- */
+*/
 
 static void access_env(int prio)
 {
@@ -224,9 +220,9 @@ static void release_env(int prio)
     sem_post(&env.mutex);
 }
 
-/**
+/*
  * COLLISIONS MANAGEMENT
- */
+*/
 
 static void def_point()
 {
@@ -288,9 +284,9 @@ static int handle_collision(missile_type_t missile_type, cell_t *cell)
 
 static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
 {
-    int x, y;
-    missile_type_t missile_type;
-    cell_type_t cell_type;
+    int             x, y;
+    missile_type_t  missile_type;
+    cell_type_t     cell_type;
 
     missile_type = missile->missile_type;
     cell_type = missile_to_cell_type(missile_type);
@@ -331,7 +327,7 @@ static int handle_collisions_around_missile(missile_t *missile, int span)
 
 static void update_missile_cell(missile_t *missile)
 {
-    int x, y;
+    int         x, y;
     cell_type_t type;
 
     x = missile->x;
@@ -343,7 +339,7 @@ static void update_missile_cell(missile_t *missile)
     env.cell[x][y].target = missile->assigned_target;
 }
 
-int update_missile_position(missile_t *missile, int oldx, int oldy)
+static int update_missile_position(missile_t *missile, int oldx, int oldy)
 {
     int collided;
 
@@ -381,7 +377,7 @@ int update_missile_env(missile_t *missile, int oldx, int oldy)
 
 pos_t scan_env_for_target_pos(int target)
 {
-    pos_t pos;
+    pos_t   pos;
 
     access_env(LOW_ENV_PRIO);
 
@@ -406,7 +402,7 @@ pos_t scan_env_for_target_pos(int target)
 
 int check_pixel(int x, int y)
 {
-    cell_t cell = env.cell[x][y];
+    cell_t  cell = env.cell[x][y];
 
     if (getpixel(screen, x, y) == ATTACKER_COLOR &&
         cell.value >= 0)
@@ -442,9 +438,9 @@ int search_screen_for_target(int t_assign)
     return 0;
 }
 
-/**
+/*
  * ENVIRONMENT DRAW
- */
+*/
 
 static void draw_legend(BITMAP *buffer, int spaces, int color, char *label)
 {
@@ -472,7 +468,7 @@ static void draw_legends(BITMAP *buffer)
 
 static void draw_labels(BITMAP *buffer, int atk_p, int def_p)
 {
-    char s[LABEL_LEN];
+    char    s[LABEL_LEN];
 
     textout_centre_ex(buffer, font, "Press SPACE", XWIN / 2, 20,
                       LABEL_COLOR, BKG_COLOR);
@@ -523,8 +519,8 @@ static void draw_goal(pos_t pos, BITMAP *buffer)
 
 static void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
 {
-    missile_type_t m_type;
-    pos_t pos;
+    missile_type_t  m_type;
+    pos_t           pos;
 
     pos.x = x;
     pos.y = y;
@@ -544,7 +540,7 @@ static void draw_cell(cell_t *cell, int x, int y, BITMAP *buffer)
     }
 }
 
-void draw_env()
+static void draw_env(BITMAP *buffer)
 {
     int x, y;
 
@@ -566,24 +562,27 @@ void draw_env()
     release_env(HIGH_ENV_PRIO);
 }
 
-static void draw_buffer_to_screen()
+static void draw_buffer_to_screen(BITMAP *buffer)
 {
     blit(buffer, screen, 0, 0, 0, 0, buffer->w, buffer->h);
 }
 
-/**
+/*
  * DISPLAY THREAD
- */
+*/
 
 static ptask display_manager(void)
 {
+    BITMAP  *buffer;
+    buffer = create_bitmap(XWIN, YWIN);
+
     while (1)
     {
-        reset_buffer();
+        reset_buffer(buffer);
 
-        draw_env();
+        draw_env(buffer);
 
-        draw_buffer_to_screen();
+        draw_buffer_to_screen(buffer);
 
         ptask_wait_for_period();
     }

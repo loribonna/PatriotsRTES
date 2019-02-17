@@ -72,6 +72,36 @@ void init_launchers()
 }
 
 /**
+ * COMMON FUNCTIONS
+ */
+
+/*
+ * Get deltatime based on current task's period.
+ * 
+ * task_index: index of the task from which get the period.
+ * 
+ */
+static float get_deltatime(int task_index, int unit)
+{
+    return (float)ptask_get_period(task_index, unit) / DELTA_FACTOR;
+}
+
+/*
+ * Get float random number between <min> and <max>.
+
+ * min: lower bound for the generated number.
+ * max: upper bound for the generated number.
+ * ~return: random floating number between the extremes.
+ */
+static float frand(float min, float max)
+{
+    float   r;
+
+    r = rand() / (float)RAND_MAX;
+    return min + (max - min) * r;
+}
+
+/**
  * QUEUE MANAGEMENT
  */
 
