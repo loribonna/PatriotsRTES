@@ -37,6 +37,7 @@ reached is goal, or for some event no longer exists, exit.
 - If there is any attacker thread, update its position. If it has reached its 
 goal, update the score and exit.
 - Draw the position updates for the missiles involved.
+The cycle ends if the `end` flag is set by the main.
 
 The defender launcher thread runs indipendently, controlling the screen in search 
 of new, untracked, attacker missiles. For each enemy point found controls the 

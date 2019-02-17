@@ -12,9 +12,7 @@
 
 #include <semaphore.h>
 #include "launchers.h"
-
-// PI constant used in calculus.
-#define M_PI            3.14159265358979323846
+#include "patriots.h"
 
 /********************************************************************
  * ENVIRNOMENT PARAMETERS

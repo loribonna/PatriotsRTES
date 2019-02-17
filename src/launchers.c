@@ -323,7 +323,7 @@ static void task_missile_movement(missile_t *missile, int task_index)
         collided = update_missile_env(missile, oldx, oldy);
 
         ptask_wait_for_period();
-    } while (!collided);
+    } while (!collided && !end);
 }
 
 /********************************************************************
@@ -399,7 +399,7 @@ static ptask atk_launcher()
 {
     int index;
 
-    while (1)
+    while (!end)
     {
         index = get_next_index(&atk_gestor.gestor);
         launch_atk_missile(index);
@@ -682,7 +682,7 @@ static ptask def_launcher()
 
         ptask_wait_for_period();
 
-    } while (1);
+    } while (!end);
 }
 
 /*

@@ -11,13 +11,7 @@
 #define LAUNCHERS_H
 
 #include <semaphore.h>
-
-// Missile radius, used for draw a missile and check collisions.
-#define MISSILE_RADIUS 5
-// Max number of missile threads -> Size of the queue.
-#define N 4
-// Division factor for deltatime.
-#define DELTA_FACTOR 1000
+#include "patriots.h"
 
 /********************************************************************
  * ATTACK PARAMETERS

@@ -601,7 +601,7 @@ static ptask display_manager(void)
     BITMAP  *buffer;
     buffer = create_bitmap(XWIN, YWIN);
 
-    while (1)
+    while (!end)
     {
         reset_buffer(buffer);
 
