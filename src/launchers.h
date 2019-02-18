@@ -89,7 +89,6 @@ typedef struct
     float           speed;                  // Current speed of the missile.
     int             index;                  // Index in the belonging queue.
     int             deleted;                // Flag to delete a missile.
-    int             cleared;                // Flag to check if is been deleted.
     int             assigned_target;        // Index assigned if discoveded.
     sem_t           mutex;                  // Mutex for the structure.
     missile_type_t  missile_type;           // Type of missile.
@@ -117,7 +116,7 @@ typedef struct
 // Trajectory of a missile, used to compute defender starting point.
 typedef struct
 {
-    float   m, angle;   // Angular coefficient and angle of the trajectory.
+    float   m;          // Angular coefficient of the trajectory.
     float   b;          // Vertical origin of the tracjectory.
     float   speed;      // Speed of the missile following the trajectory.
 }   trajectory_t;
@@ -145,7 +144,8 @@ void launch_atk_launcher();
 void launch_def_launcher();
 
 /*
- * Request an attacker missile task launch.
+ * BLOCKING: Request an attacker missile task launch.
+ * Block if there are tasks to wake up.
  */
 void request_atk_launch();
 

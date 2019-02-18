@@ -44,12 +44,19 @@ void init_private_sem(private_sem_t *p_sem)
     sem_init(&p_sem->sem, 0, 0);
 }
 
+/*
+ * Initialize a queue gestor.
+ * 
+ * gestor: reference to the queue gestor to initialize.
+ */
 static void init_queue(fifo_queue_gestor_t *gestor)
 {
     int i;
 
     gestor->freeIndex = 0;
     gestor->headIndex = gestor->tailIndex = -1;
+
+    /* Initialize concatenated queue from freeIndex. */
     for (i = 0; i < N - 1; i++)
     {
         gestor->next[i] = i + 1;
@@ -62,16 +69,26 @@ static void init_queue(fifo_queue_gestor_t *gestor)
     init_private_sem(&gestor->write_sem);
 }
 
+/*
+ * Initialize a missile structure as empty.
+ * 
+ * missile: reference to the missile to initialize.
+ */
 static void init_empty_missile(missile_t *missile)
 {
     sem_init(&missile->mutex, 0, 1);
-    missile->deleted = missile->cleared = 0;
+    missile->deleted = 0;
     missile->speed = missile->angle = 0;
     missile->partial_x = missile->partial_y = 0;
     missile->x = missile->y = 0;
     missile->assigned_target = missile->index = -1;
 }
 
+/*
+ * Initialize a missile queue gestor.
+ * 
+ * m_gestor: reference to the missile gestor to initialize.
+ */
 static void init_missiles_gestor(missile_gestor_t *m_gestor)
 {
     int i;
@@ -84,11 +101,17 @@ static void init_missiles_gestor(missile_gestor_t *m_gestor)
     }
 }
 
+/*
+ * Initialize the attack launcher missile gestor structure.
+ */
 static void init_atk_launcher()
 {
     init_missiles_gestor(&atk_gestor);
 }
 
+/*
+ * Initialize the attack launcher missile gestor structure.
+ */
 static void init_def_launcher()
 {
     init_missiles_gestor(&def_gestor);
@@ -137,24 +160,31 @@ static float frand(float min, float max)
  * QUEUE MANAGEMENT
 ********************************************************************/
 
+/*
+ * Add the current index to the head of the queue.
+ * 
+ * gestor: reference to the queue gestor.
+ * index: index to push to the head.
+ */
 static void update_queue_head(fifo_queue_gestor_t *gestor, int index)
 {
     assert(index >= 0 && gestor->read_sem.blk > 0);
 
-    gestor->next[index] = -1;
-    if (gestor->headIndex == -1)
+    gestor->next[index] = -1;       // Added index will be the end of the queue.
+    if (gestor->headIndex == -1)    // Update head if was empty,
     {
         gestor->headIndex = index;
     }
-    else
+    else                            // else concatenate with previous indexes.
     {
         gestor->next[gestor->tailIndex] = index;
     }
-    gestor->tailIndex = index;
+    gestor->tailIndex = index;      // Keep track of last added index.
 }
 
 /*
- * Request an attacker missile task launch.
+ * BLOCKING: Request an attacker missile task launch.
+ * Block if there are tasks to wake up.
  */
 void request_atk_launch()
 {
@@ -165,19 +195,27 @@ void request_atk_launch()
 
     sem_wait(&(gestor->mutex));
 
+    /* If there are no free indexes or blocked readers do not block. */
     if (gestor->freeIndex == -1 || !gestor->read_sem.blk)
     {
         sem_post(&(gestor->mutex));
     }
-    else
+    else    
     {
         index = gestor->freeIndex;
         gestor->freeIndex = gestor->next[gestor->freeIndex];
-        update_queue_head(gestor, index);
-        sem_post(&(gestor->read_sem).sem);
+        update_queue_head(gestor, index);   // Get and indert an index in head.
+        sem_post(&(gestor->read_sem).sem);  // Mutex passed to the waken reader.
     }
 }
 
+/*
+ * BLOCKING: Request a free index from the defender missile gestor.
+ * Block if there are no free index available or if there are other
+ * waiting tasks.
+ * 
+ * ~return: free index for the missile queue.
+ */
 int request_def_index()
 {
     int                 index;
@@ -195,6 +233,9 @@ int request_def_index()
         gestor->write_sem.blk--;
     }
 
+    assert(gestor->freeIndex >= 0);
+
+    /* Take the first free index and point to the next one. */
     index = gestor->freeIndex;
     gestor->freeIndex = gestor->next[gestor->freeIndex];
 
@@ -203,6 +244,13 @@ int request_def_index()
     return index;
 }
 
+/*
+ * BLOCKING: Request a index from the head of the queue.
+ * Block if there are no head index available.
+ * 
+ * gestor: reference to the queue gestor.
+ * ~return: index for the queue.
+ */
 static int get_next_index(fifo_queue_gestor_t *gestor)
 {
     int index;
@@ -227,14 +275,21 @@ static int get_next_index(fifo_queue_gestor_t *gestor)
     return index;
 }
 
+/*
+ * Release an index from the queue specified.
+ * 
+ * gestor: reference to the queue gestor.
+ * index: used index to release.
+ */
 static void splice_index(fifo_queue_gestor_t *gestor, int index)
 {
     assert(index >= 0);
 
+    /* The spliced index is set as the start of the queue. */
     gestor->next[index] = gestor->freeIndex;
     gestor->freeIndex = index;
 
-    if (gestor->write_sem.blk)
+    if (gestor->write_sem.blk)  // Mutex passing to the blocked task.
     {
         sem_post(&gestor->write_sem.sem);
     }
@@ -262,38 +317,38 @@ void assign_target_to_atk(int index, int target)
     missile->assigned_target = target;
 }
 
-static void init_atk_params(tpars *params, void *arg)
-{
-    ptask_param_init(*params);
-    ptask_param_period((*params), ATK_MISSILE_PERIOD, MILLI);
-    ptask_param_priority((*params), ATK_MISSILE_PRIO);
-    ptask_param_activation((*params), NOW);
-    params->arg = arg;
-}
-
+/*
+ * BLOCKING: Release the data associated with a missile structure.
+ * Block if there are tasks to wake up.
+ * 
+ * gestor: reference to the queue gestor to release the missile index.
+ * missile: reference to the missile structure to clear.
+ */
 static void clear_missile(missile_t *missile, fifo_queue_gestor_t *gestor)
 {
     int index;
 
     sem_wait(&gestor->mutex);
-    if (!missile->cleared)
-    {
-        index = missile->index;
-        init_empty_missile(missile);
 
-        splice_index(gestor, index);
-    }
-    else
-    {
-        sem_post(&gestor->mutex);
-    }
+    index = missile->index;
+    init_empty_missile(missile);
+
+    splice_index(gestor, index);
+    
 }
 
-static int move_missile(missile_t *missile, float deltatime)
+/*
+ * Update missile structure position based on speed and angle.
+ * 
+ * missile: reference to the missile structure to update.
+ * deltatime: deltatime between task activation, used to smooth
+ * the movement.
+ */
+static void move_missile(missile_t *missile, float deltatime)
 {
     float   dx, dy, angle_rad;
 
-    angle_rad = missile->angle * (M_PI / 180);
+    angle_rad = missile->angle * (M_PI / 180);  // Convert degrees in radians.
 
     dx = missile->speed * cos(angle_rad);
     dy = missile->speed * sin(angle_rad);
@@ -303,16 +358,21 @@ static int move_missile(missile_t *missile, float deltatime)
 
     missile->x = (int)missile->partial_x;
     missile->y = (int)missile->partial_y;
-
-    return 0;
 }
 
+/*
+ * Missile task movement loop: update missile position until there
+ * is a collision or the end is signaled.
+ * 
+ * missile: reference to the missile structure to update.
+ * task_index: index of the missile task.
+ */
 static void task_missile_movement(missile_t *missile, int task_index)
 {
     int     oldx, oldy, collided;
     float   deltatime;
 
-    deltatime = get_deltatime(task_index, MILLI);
+    deltatime = get_deltatime(task_index, MILLI); // Task period doesn't change.
 
     do
     {
@@ -330,6 +390,24 @@ static void task_missile_movement(missile_t *missile, int task_index)
  * ATTACK THREADS
 ********************************************************************/
 
+/*
+ * Initialize the attack missile task parameters.
+ * 
+ * params: reference to the params to initialize.
+ * arg: reference to an argument to pass to the task.
+ */
+static void init_atk_params(tpars *params, void *arg)
+{
+    ptask_param_init(*params);
+    ptask_param_period((*params), ATK_MISSILE_PERIOD, MILLI);
+    ptask_param_priority((*params), ATK_MISSILE_PRIO);
+    ptask_param_activation((*params), NOW);
+    params->arg = arg;
+}
+
+/*
+ * Attacker missile task.
+ */
 static ptask atk_thread(void)
 {
     missile_t   *self;
@@ -343,6 +421,12 @@ static ptask atk_thread(void)
     clear_missile(self, &atk_gestor.gestor);
 }
 
+/*
+ * Launch a new attacker missile task given the missile structure.
+ * 
+ * missile: reference to the missile structure to associate with the task.
+ * ~return: -1 if an error occurs with the task creation, else >0.
+ */
 static int launch_atk_thread(missile_t *missile)
 {
     tpars   params;
@@ -352,6 +436,9 @@ static int launch_atk_thread(missile_t *missile)
     return ptask_create_param(atk_thread, &params);
 }
 
+/*
+ * Wait operation between attacker missile launches.
+ */
 static void atk_wait()
 {
     struct timespec t;
@@ -360,6 +447,11 @@ static void atk_wait()
     nanosleep(&t, NULL);
 }
 
+/*
+ * Initialize attacker missile structure with a random parameters.
+ * 
+ * missile: reference to the missile structure to initialize.
+ */
 static void set_random_start(missile_t *missile)
 {
     missile->partial_x = (int)frand(0, XWIN);
@@ -375,6 +467,12 @@ static void set_random_start(missile_t *missile)
             missile->index, missile->speed);
 }
 
+/*
+ * Initialize attacker missile structure.
+ * 
+ * missile: reference to the missile structure to initialize.
+ * index: index from the missile queue of the missile.
+ */
 static void init_atk_missile(missile_t *missile, int index)
 {
     init_empty_missile(missile);
@@ -383,6 +481,11 @@ static void init_atk_missile(missile_t *missile, int index)
     set_random_start(missile);
 }
 
+/*
+ * Initialize structure and launch an attacker missile task.
+ * 
+ * index: index from the missile queue of the missile.
+ */
 static void launch_atk_missile(int index)
 {
     missile_t   *missile;
@@ -392,16 +495,20 @@ static void launch_atk_missile(int index)
     init_atk_missile(missile, index);
 
     thread = launch_atk_thread(missile);
+
     assert(thread >= 0);
 }
 
+/*
+ * Attack missile launcher task.
+ */
 static ptask atk_launcher()
 {
     int index;
 
     while (!end)
     {
-        index = get_next_index(&atk_gestor.gestor);
+        index = get_next_index(&atk_gestor.gestor); // Wait for an index to use.
         launch_atk_missile(index);
         atk_wait();
         ptask_wait_for_period();
@@ -442,6 +549,9 @@ void delete_atk_missile(int index)
  * DEFENDER THREADS
 ********************************************************************/
 
+/*
+ * Wait operation between defender missile launches.
+ */
 static void def_wait()
 {
     struct timespec t;
@@ -468,6 +578,7 @@ int is_already_tracked(int target)
 
     ret = 0;
 
+    /* Check if target index is already assigned to a defender missile. */
     for (i = 0; i < N; i++)
     {
         ret |= def_gestor.queue[i].index == target;
@@ -476,48 +587,76 @@ int is_already_tracked(int target)
     return ret;
 }
 
+/*
+ * Get euclidean distance between points.
+ * 
+ * pos_a: reference to a position in 2D space.
+ * pos_b: reference to a position in 2D space.
+ * ~return: distance between input points.
+ */
 static float get_pos_distance(pos_t *pos_a, pos_t *pos_b)
 {
     return sqrt(pow(pos_a->x - pos_b->x, 2) + pow(pos_a->y - pos_b->y, 2));
 }
 
+/*
+ * Get angular coefficient of the straight line between points.
+ * 
+ * pos_a: reference to a position in 2D space.
+ * pos_b: reference to a position in 2D space.
+ * ~return: angualr coefficient of the straight line between input points.
+ */
 static float get_line_m(pos_t *pos_a, pos_t *pos_b)
 {
-    if (pos_b->x == pos_a->x)
+    if (pos_b->x == pos_a->x)   // If dx is 0 should not be accounted.
     {
         return 0.0;
     }
     return (float)(pos_b->y - pos_a->y) / (float)(pos_b->x - pos_a->x);
 }
 
-static float get_line_angle(pos_t *pos_a, pos_t *pos_b)
-{
-    return (atan2((pos_b->y - pos_a->y), (pos_b->x - pos_a->x)) * 180) / M_PI;
-}
-
-static float get_line_b_with_m(float m, pos_t *pos)
+/*
+ * Get vertical origin of the straight line between points.
+ * 
+ * pos_a: reference to a position in 2D space.
+ * pos_b: reference to a position in 2D space.
+ * ~return: vertical origin of the straight line between input points.
+ */
+static float get_line_b(float m, pos_t *pos)
 {
     return -m * pos->x + pos->y;
 }
 
+/*
+ * Get y coordinate of the trajectory from the x coordinate.
+ * 
+ * t: reference to the trajectory in 2D space.
+ * x: x coordinate.
+ * ~return: y coordinate value for the given input.
+ */
 static float get_y_from_trajectory(trajectory_t *t, float x)
 {
     return t->m * x + t->b;
 }
 
 /*
- * Calculate expected intercept between target trajectory (t) given
- * its last known position (current).
- * Solved by using Bisection method.
+ * Calculate expected intercept between the target trajectory given
+ * its last known position. Solved by using Bisection method.
+ * In-depth analysis of the algoritm in the README.
+ * 
+ * t: reference to the trajectory of the target missile.
+ * current: reference to the last position of the target.
+ * ~return: expected x coordinate of the intersection.
  */
 static int get_expected_position_x(trajectory_t *t, pos_t *current)
 {
     float   x, y, dsa, dsb, tmp_dsa, x_min, x_max;
     int     i;
 
-    i = 0;
+    /* Initialized with screen limits. */
     x_min = t->m < 0 ? WALL_THICKNESS + MISSILE_RADIUS + 1 : current->x;
     x_max = t->m < 0 ? current->x : XWIN - WALL_THICKNESS - MISSILE_RADIUS - 1;
+    i = 0;
 
     do
     {
@@ -538,25 +677,50 @@ static int get_expected_position_x(trajectory_t *t, pos_t *current)
     return (int)x;
 }
 
+/*
+ * Get the speed between two points in 2D space given the time.
+ * 
+ * pos_a: reference to the starting position in 2D space.
+ * pos_b: reference to the ending position in 2D space.
+ * t_time: total time to reach the ending position from the starting.
+ * ~return: averege speed between the input points.
+ */
 static float calc_speed(pos_t *pos_a, pos_t *pos_b, float t_time)
 {
     assert(t_time > 0);
     return get_pos_distance(pos_a, pos_b) / t_time;
 }
 
+/*
+ * Calculate deltatime from the start and end time.
+ * 
+ * t_start: starting timespec time.
+ * t_end: ending timespec time.
+ * ~return: deltatime in seconds from the starting to the ending time.
+ */
 static float calc_dt(struct timespec t_start, struct timespec t_end)
 {
     return (float)(t_end.tv_sec - t_start.tv_sec) +
            (t_end.tv_nsec - t_start.tv_nsec) / 1000000000.0;
 }
 
+/*
+ * Get starting and ending position of the target and mesure time. To
+ * enhance the precision, keep collect samples until a given level of
+ * precision or a loop limit is reached.
+ * 
+ * pos_a: reference to the starting position.
+ * pos_b: reference to the ending position.
+ * trgt: index of the target to analyze.
+ * dt: reference to the deltatime between starting and ending position.
+ */
 static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trgt, float *dt)
 {
     struct timespec t_start, t_end;
     float speed_a, speed_b;
     int i;
 
-    clock_gettime(CLOCK_MONOTONIC, &t_start);
+    clock_gettime(CLOCK_MONOTONIC, &t_start);       // Use absolute time.
     *pos_a = scan_env_for_target_pos(trgt);
     speed_b = i = 0;
 
@@ -569,13 +733,19 @@ static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trgt, float *dt)
         *dt = calc_dt(t_start, t_end);
         speed_b = calc_speed(pos_a, pos_b, *dt);
 
-        ptask_wait_for_period();
+        ptask_wait_for_period();                    // Let the target update.
         i++;
-    } while (i < SAMPLE_LIMIT &&
-             (fabs(speed_b - speed_a) > EPSILON ||
-              i < MIN_SAMPLES || speed_b == 0));
+    } while (i < SAMPLE_LIMIT &&                    // Check upper bound,
+             (fabs(speed_b - speed_a) > EPSILON ||  // precision,
+              i < MIN_SAMPLES || speed_b == 0));    // lower bound.
 }
 
+/*
+ * Calculate the expected x coordinate in order to intercept the target.
+ * 
+ * target: index of the target to analyze.
+ * ~return: expected x coordinate to intercept the target.
+ */
 static int get_start_x_position(int target)
 {
     trajectory_t    trajectory;
@@ -586,11 +756,11 @@ static int get_start_x_position(int target)
 
     assert(dt != 0);
 
+    /* If the x coordinate doesn't change the calculus is useless. */
     if (pos_a.x != pos_b.x)
     {
         trajectory.m = get_line_m(&pos_a, &pos_b);
-        trajectory.angle = get_line_angle(&pos_a, &pos_b);
-        trajectory.b = get_line_b_with_m(trajectory.m, &pos_a);
+        trajectory.b = get_line_b(trajectory.m, &pos_a);
         trajectory.speed = calc_speed(&pos_a, &pos_b, dt);
 
         fprintf(stderr, "DEF: Calculated speed for target %i: %f\n",
@@ -601,23 +771,32 @@ static int get_start_x_position(int target)
     return pos_a.x;
 }
 
-static void set_missile_trajectory(missile_t *missile, float start_x)
+/*
+ * Initialize defender missile structure with the given trajectory.
+ * 
+ * missile: reference to the missile structure to initialize.
+ * start_x: horizontal starting point of the missile.
+ */
+static void set_missile_trajectory(missile_t *missile, int start_x)
 {
     missile->partial_y = missile->y = DEF_MISSILE_START_Y;
-    missile->partial_x = missile->x = (int)start_x;
+    missile->partial_x = missile->x = start_x;
     missile->angle = 90;
     missile->speed = -DEF_MISSILE_SPEED;
 }
 
+/*
+ * Defender missile task.
+ */
 static ptask def_thread()
 {
     missile_t   *self;
-    float       start_x;
-    int         task_index;
+    int         start_x, task_index;
 
     task_index = ptask_get_index();
     self = ptask_get_argument();
 
+    /* Expected intercept calculus done before start moving. */
     start_x = get_start_x_position(self->index);
     set_missile_trajectory(self, start_x);
 
@@ -626,6 +805,12 @@ static ptask def_thread()
     clear_missile(self, &def_gestor.gestor);
 }
 
+/*
+ * Initialize defender missile task parameters.
+ * 
+ * params: reference to the parameters to initialize.
+ * arg: reference to a parameter to pass to the task.
+ */
 static void init_def_params(tpars *params, void *arg)
 {
     ptask_param_init(*params);
@@ -635,6 +820,13 @@ static void init_def_params(tpars *params, void *arg)
     params->arg = arg;
 }
 
+/*
+ * Launch a new defender missile task given the missile structure.
+ * 
+ * 
+ * missile: reference to the missile structure to associate with the task.
+ * ~return: -1 if an error occurs with the task creation.
+ */
 static int launch_def_thread(missile_t *missile)
 {
     tpars   params;
@@ -644,6 +836,9 @@ static int launch_def_thread(missile_t *missile)
     return ptask_create_param(def_thread, &params);
 }
 
+/*
+ * Initialize a defender missile structure.
+ */
 static void init_def_missile(missile_t *missile, int index)
 {
     init_empty_missile(missile);
@@ -651,6 +846,11 @@ static void init_def_missile(missile_t *missile, int index)
     missile->missile_type = DEFENDER;
 }
 
+/*
+ * Initialize structure and launch an defender missile task.
+ * 
+ * index: index from the missile queue of the missile.
+ */
 static void launch_def_missile(int index)
 {
     missile_t   *missile;
@@ -660,9 +860,13 @@ static void launch_def_missile(int index)
     init_def_missile(missile, index);
 
     thread = launch_def_thread(missile);
+
     assert(thread >= 0);
 }
 
+/*
+ * Defender missile launcher task.
+ */
 static ptask def_launcher()
 {
     int index;
@@ -670,13 +874,14 @@ static ptask def_launcher()
     index = request_def_index();
     do
     {
+        /* If a valid index was acquired no need to get it again. */
         index = index >= 0 ? index : request_def_index();
         if (search_screen_for_target(index))
         {
             fprintf(stderr, "DEF_LAUNCHER: Found target and assigned %i\n",
                     index);
             launch_def_missile(index);
-            index = -1;
+            index = -1; // Reset index to acquire a new one.
             def_wait();
         }
 
