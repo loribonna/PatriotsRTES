@@ -21,13 +21,14 @@ for every cycle of the system.
 - The attacker missiles are threads that, given a random starting position and 
 angle, follows a straight direction to reach the other side of the screen.
 - The defender missiles are threads that must intercept the assigned attacker
-missile *before* it reachs its goal. The direction is determined before the missile
-starts moving, after analyzing the assigned attacker's direction and speed.
+missile *before* it reachs its goal. The direction is determined before the 
+missile starts moving, after analyzing the assigned attacker's direction and 
+speed.
 
-In the current version, the defender missile follows a straight line with an angle 
-of 90 degrees to intercept the attacker. Following versions will have the attacker
-missile following a random path and the defender thread will have to compute 
-and update its direction on every cycle.
+In the current version, the defender missile follows a straight line with an 
+angle of 90 degrees to intercept the attacker. Following versions will have 
+the attacker missile following a random path and the defender thread will have 
+to compute and update its direction on every cycle.
 
 A system cycle performs the following tasks:
 - If there is any defender thread, update its position accordingly to the 
@@ -39,7 +40,7 @@ goal, update the score and exit.
 - Draw the position updates for the missiles involved.
 The cycle ends if the `end` flag is set by the main.
 
-The defender launcher thread runs indipendently, controlling the screen in search 
+The defender launcher thread runs indipendently, scanning the screen in search 
 of new, untracked, attacker missiles. For each enemy point found controls the 
 environment to check if was already tracked. If there are untracked attacking 
 missiles and the defending queue is not full, a new defending missile thread 
@@ -48,8 +49,75 @@ is spawned and the corresponding attacker index is marked as `tracked`.
 An attacker missile is marked as `tracked` by assigning an index that will be
 used to check its position by the defender missile.
 
-The attacker launcher reacts on a keyboard event, spawning a new attacker
-missile if the queue is not full. The missile spawned has random speed and angle.
+The attacker launcher reacts on a keyboard event, spawning a new attacker 
+missile if the queue is not full.
+The missile spawned has random speed and angle.
+
+## Details about trajectory prediction
+
+To search for the optimal horizontal starting point in order to intercept the 
+attacker missile, the defender missile must compute speed and direction of the 
+target. This is done by the `collect_positions` function. To take account of 
+the possible overheads and suspensions of the current thread, it is necessary 
+to use the absolute time of the machine.
+
+In order to have an acceptable level of precision, it is necessary to repeat 
+the scan of the target multiple times, until the gap between multiple mesured 
+speeds is low enough.
+
+The x coordinate of the starting position is then calculated by bisection by 
+the function `get_expected_position_x`.
+
+The algoritm needs to take account of the direction of the target in order to 
+initialize correctly the parameters. If the angular coefficient of the target 
+is greater of 0, the interception point will be in the right with respect to 
+the last position and viceversa (because the screen is inverted vertically).
+
+In the algoritm the suffix 'b' is related to the defender trajectory and the
+suffix 'a' to the attacker trajectory.
+
+The static parameters of the algoritm are:
+ * `DEF_MISSILE_START_Y`: vertical starting point the defender missiles.
+ * `DEF_MISSILE_SPEED`: speed of the defender missiles.
+ * `SAMPLE_LIMIT`: upper bound for the calculation, to avoid infinite loop.
+ * `EPSILON`: Level of precision required.
+
+The main parameters of the algoritm are:
+ * `x_min`: starting point of the horizontal window where the intercept can be.
+ * `x_max`: ending point of the horizontal window where the intercept can be.
+ * `speed_a`: estimated speed of the target missile.
+ * `dsb`: euclidean distance from the defender starting point and the intercept. 
+ Because the defender trajectory is straight, this is equal to the difference 
+ of the vertical coordinates of the points.
+ * `dsa`: distance from the attacker's last position and the intercept, 
+ calculated using the current intercept.
+ * `tmp_dsa`: distance from the attacker's last position and the intercept,
+ calculated from `dsb`. Given the speed of the target (`speed_a`) and the 
+constant speed (`DEF_MISSILE_SPEED`) of the defender missile, the distance 
+ between the intercept and the defender starting point (`dsb`) and the 
+ intercept and the target last position (`dsa`) is: 
+ `dsa = (speed_a / DEF_MISSILE_SPEED) * dsb`.
+
+The algoritm performs the following steps:
+ * Initialization of the parameters `x_min` and `x_max` based on the angular
+ coefficient of the trajectory and the last position of the target.
+ * Repeat until convergence:
+    * Take a coordinate `x` in the middle of `x_min` and `x_max` and the 
+    relative `y` coordinate based on the target trajectory. The couple `(x, y)` 
+    are the current expected interception point.
+    * Calculate `dsb` and `dsa` directly from the current interception point.
+    * Calculate `tmp_dsa` using the relation with `dsb`.
+    * Update `x_min` and `x_max`:
+        * If `tmp_dsa` is less than `dsa` i need to raise `dsb`, so the current
+        `x` value of the intercept must be assigned to `x_min`. Viceversa, if
+        if `tmp_dsa` is greater than `dsa` i need to lower `dsb`, which means 
+        assign the `x` value of the intercept to `x_max`. The former scenario
+        refers to the case where the angular coefficient `m` of the target is
+        less than 0. For the other scenario it is sufficient to swap the 
+        conditions.
+    * Calculate the error of the prediction by taking the absolute difference
+    between `tmp_dsa` and `dsa`. The algoritm converges if the error is less 
+    than `EPSILON`.
 
 ## Static parameters
 
