@@ -19,7 +19,7 @@ void init()
 
     init_launchers();
 
-    ptask_init(SCHED_FIFO, GLOBAL, NO_PROTOCOL);
+    ptask_init(SCHED_RR, GLOBAL, NO_PROTOCOL);
 }
 
 /*

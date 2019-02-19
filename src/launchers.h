@@ -10,7 +10,9 @@
 #ifndef LAUNCHERS_H
 #define LAUNCHERS_H
 
+#include <stdlib.h>
 #include <semaphore.h>
+
 #include "patriots.h"
 
 /********************************************************************
@@ -33,7 +35,9 @@
 // Priority of the attack missile task.
 #define ATK_MISSILE_PRIO 2
 // Period of the attack missile task.
-#define ATK_MISSILE_PERIOD 30
+#define ATK_MISSILE_PERIOD 10
+// Relative deadline of the attacker missile task.
+#define ATK_MISSILE_DEADLINE (ATK_MISSILE_PERIOD)
 
 /********************************************************************
  * DEFENDER PARAMETERS
@@ -53,10 +57,12 @@
 // Priority of the defender missile task.
 #define DEF_MISSILE_PRIO 2
 // Period of the defender missile task.
-#define DEF_MISSILE_PERIOD 30
+#define DEF_MISSILE_PERIOD 15
+// Relative deadline of the defender missile task.
+#define DEF_MISSILE_DEADLINE (DEF_MISSILE_PERIOD)
 
 // Precision used in trajectory calculation (percentual)
-#define TRAJECTORY_PRECISION 10
+#define TRAJECTORY_PRECISION 50
 // Ubber extremity to limit trajectory calculation loop.
 #define SAMPLE_LIMIT (2 * TRAJECTORY_PRECISION)
 // Minimum number of samples to collect to calculate the trajectory

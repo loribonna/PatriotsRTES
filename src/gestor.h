@@ -10,7 +10,9 @@
 #ifndef GESTOR_H
 #define GESTOR_H
 
+#include <stdlib.h>
 #include <semaphore.h>
+
 #include "launchers.h"
 #include "patriots.h"
 
@@ -38,11 +40,13 @@
 ********************************************************************/
 
 // Refresh rate of the screen (updates per second)
-#define REFRESH_RATE    30
+#define REFRESH_RATE    60
 // Period of the display manager task.
 #define DISPLAY_PERIOD  ((int)(1000 / REFRESH_RATE))
 // Priority of the display manager task.
 #define DISPLAY_PRIO    3
+// Relative deadline of the display manager task.
+#define DISPLAY_DEADLINE        (DISPLAY_PERIOD)
 
 // Horizontal size of the window.
 #define XWIN            640
@@ -66,7 +70,9 @@
 // Color of the defender missile (11 = light cyan).
 #define DEFENDER_COLOR  11
 
-// Maximum length of string of text in labels
+// Vertical starting point of the tutorial text.
+#define TUTORIAL_Y      10
+// Maximum length of string of text in labels.
 #define LABEL_LEN       30
 // Height of the rectangle used in the legend.
 #define RECT_H          8
@@ -75,13 +81,13 @@
 // Horizontal starting point of the legend.
 #define LEGEND_X        (XWIN - 120)
 // Vertical starting point of the legend.
-#define LEGEND_Y        10
+#define LEGEND_Y        (TUTORIAL_Y + 20)
 // Height of the text labels, used to calculate vertical starting point.
 #define LABEL_H         10
 // Horizontal starting point of the text labels.
 #define LABEL_X         10
 // Get vertical starting point given the number of spaces (s).
-#define GET_Y_LABEL(s)  (XWIN - s * LABEL_H)
+#define GET_Y_LABEL(s)  (YWIN - s * LABEL_H)
 // Spaces between lines in the legend.
 #define SPACING         2
 
@@ -128,6 +134,26 @@ void init_gestor();
  * Launch display manager task.
  */
 void launch_display_manager();
+
+/*
+ * Check if a deadline was missed in the current task and print an informative
+ * message.
+ * 
+ * message: array of characters (string) with the message to print in case
+ * of a deadline miss.
+ */
+void check_deadline(char *message);
+
+/*
+ * Check if a deadline was missed by a messile task and print an informative
+ * formatted string.
+ * 
+ * message: array of characters (string) with the message to print in case
+ * of a deadline miss.
+ * type: type of the missile base of the task.
+ * index: index of the missile base of the task.
+ */
+void check_missile_deadline(char *message, missile_type_t type, int index);
 
 /*
  * Update missile position in the environment and check for collisions.

@@ -54,14 +54,14 @@ static void init_queue(fifo_queue_gestor_t *gestor)
     int i;
 
     gestor->freeIndex = 0;
-    gestor->headIndex = gestor->tailIndex = -1;
+    gestor->headIndex = gestor->tailIndex = NONE;
 
     /* Initialize concatenated queue from freeIndex. */
     for (i = 0; i < N - 1; i++)
     {
         gestor->next[i] = i + 1;
     }
-    gestor->next[N - 1] = -1;
+    gestor->next[N - 1] = NONE;
 
     sem_init(&(gestor->mutex), 0, 1);
 
@@ -81,7 +81,7 @@ static void init_empty_missile(missile_t *missile)
     missile->speed = missile->angle = 0;
     missile->partial_x = missile->partial_y = 0;
     missile->x = missile->y = 0;
-    missile->assigned_target = missile->index = -1;
+    missile->assigned_target = missile->index = NONE;
 }
 
 /*
@@ -170,8 +170,8 @@ static void update_queue_head(fifo_queue_gestor_t *gestor, int index)
 {
     assert(index >= 0 && gestor->read_sem.blk > 0);
 
-    gestor->next[index] = -1;       // Added index will be the end of the queue.
-    if (gestor->headIndex == -1)    // Update head if was empty,
+    gestor->next[index] = NONE;       // Added index will be the end of the queue.
+    if (gestor->headIndex == NONE)    // Update head if was empty,
     {
         gestor->headIndex = index;
     }
@@ -196,7 +196,7 @@ void request_atk_launch()
     sem_wait(&(gestor->mutex));
 
     /* If there are no free indexes or blocked readers do not block. */
-    if (gestor->freeIndex == -1 || !gestor->read_sem.blk)
+    if (gestor->freeIndex == NONE || !gestor->read_sem.blk)
     {
         sem_post(&(gestor->mutex));
     }
@@ -225,7 +225,7 @@ int request_def_index()
 
     sem_wait(&(gestor->mutex));
 
-    if (gestor->freeIndex == -1 || gestor->write_sem.blk)
+    if (gestor->freeIndex == NONE || gestor->write_sem.blk)
     {
         gestor->write_sem.blk++;
         sem_post(&(gestor->mutex));
@@ -257,7 +257,7 @@ static int get_next_index(fifo_queue_gestor_t *gestor)
 
     sem_wait(&(gestor->mutex));
 
-    if (gestor->headIndex == -1)
+    if (gestor->headIndex == NONE)
     {
         gestor->read_sem.blk++;
         sem_post(&(gestor->mutex));
@@ -382,6 +382,9 @@ static void task_missile_movement(missile_t *missile, int task_index)
         move_missile(missile, deltatime);
         collided = update_missile_env(missile, oldx, oldy);
 
+        check_missile_deadline("- Missle type %i index %i missed the deadline \
+                    (0: ATK, 1: DEF)\n", missile->missile_type, missile->index);
+
         ptask_wait_for_period();
     } while (!collided && !end);
 }
@@ -399,6 +402,7 @@ static void task_missile_movement(missile_t *missile, int task_index)
 static void init_atk_params(tpars *params, void *arg)
 {
     ptask_param_init(*params);
+    ptask_param_deadline((*params), ATK_MISSILE_DEADLINE, MILLI);
     ptask_param_period((*params), ATK_MISSILE_PERIOD, MILLI);
     ptask_param_priority((*params), ATK_MISSILE_PRIO);
     ptask_param_activation((*params), NOW);
@@ -701,7 +705,7 @@ static float calc_speed(pos_t *pos_a, pos_t *pos_b, float t_time)
 static float calc_dt(struct timespec t_start, struct timespec t_end)
 {
     return (float)(t_end.tv_sec - t_start.tv_sec) +
-           (t_end.tv_nsec - t_start.tv_nsec) / 1000000000.0;
+           (t_end.tv_nsec - t_start.tv_nsec) / NANOSECOND_TO_SECONDS;
 }
 
 /*
@@ -733,6 +737,7 @@ static void collect_positions(pos_t *pos_a, pos_t *pos_b, int trgt, float *dt)
         *dt = calc_dt(t_start, t_end);
         speed_b = calc_speed(pos_a, pos_b, *dt);
 
+        check_deadline("- DEF Missle missed the deadline");
         ptask_wait_for_period();                    // Let the target update.
         i++;
     } while (i < SAMPLE_LIMIT &&                    // Check upper bound,
@@ -814,6 +819,7 @@ static ptask def_thread()
 static void init_def_params(tpars *params, void *arg)
 {
     ptask_param_init(*params);
+    ptask_param_deadline((*params), DEF_MISSILE_DEADLINE, MILLI);
     ptask_param_period((*params), DEF_MISSILE_PERIOD, MILLI);
     ptask_param_priority((*params), DEF_MISSILE_PRIO);
     ptask_param_activation((*params), NOW);
@@ -881,7 +887,7 @@ static ptask def_launcher()
             fprintf(stderr, "DEF_LAUNCHER: Found target and assigned %i\n",
                     index);
             launch_def_missile(index);
-            index = -1; // Reset index to acquire a new one.
+            index = NONE; // Reset index to acquire a new one.
             def_wait();
         }
 
