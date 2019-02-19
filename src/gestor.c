@@ -161,6 +161,35 @@ void init_gestor()
 ********************************************************************/
 
 /*
+ * Check if a deadline was missed in the current task and print an informative
+ * message. 
+ */
+void check_deadline(char *message)
+{
+    if (ptask_deadline_miss())
+    {
+        fputs(message, stderr);
+    }
+}
+
+/*
+ * Check if a deadline was missed by a messile task and print an informative
+ * formatted string.
+ * 
+ * message: array of characters (string) with the message to print in case
+ * of a deadline miss.
+ * type: type of the missile base of the task.
+ * index: index of the missile base of the task.
+ */
+void check_missile_deadline(char *message, missile_type_t type, int index)
+{
+    char s[INFO_LEN];
+
+    sprintf(s, message, type, index);
+    check_deadline(s);
+}
+
+/*
  * Reset the buffer to the background color.
  * 
  * buffer: reference to the buffer.
@@ -543,7 +572,7 @@ int update_missile_env(missile_t *missile, int oldx, int oldy)
  * 
  * target: index of the target to search in the screen.
  * ~return: current position of the target. If the target
- * was not found, the position returned is (-1, -1).
+ * was not found, the position returned is (NONE, NONE).
  */
 pos_t scan_env_for_target_pos(int target)
 {
@@ -565,8 +594,8 @@ pos_t scan_env_for_target_pos(int target)
 
     release_env(LOW_ENV_PRIO);
 
-    pos.x = -1;
-    pos.y = -1;
+    pos.x = NONE;
+    pos.y = NONE;
     return pos;
 }
 
@@ -673,8 +702,9 @@ static void draw_labels(BITMAP *buffer, int atk_p, int def_p)
 {
     char    s[LABEL_LEN];
 
-    textout_centre_ex(buffer, font, "Press SPACE", XWIN / 2, 20,
-                      LABEL_COLOR, BKG_COLOR);
+    textout_centre_ex(buffer, font, 
+                      "Press SPACE to create an attacker missile, ESC to exit", 
+                      XWIN / 2, TUTORIAL_Y, LABEL_COLOR, BKG_COLOR);
 
     sprintf(s, "Attack points: %i", atk_p);
     textout_ex(buffer, font, s, LABEL_X,
@@ -829,21 +859,37 @@ static ptask display_manager(void)
 
         draw_buffer_to_screen(buffer);
 
+        check_deadline("- Display manager missed the deadline\n");
+
         ptask_wait_for_period();
     }
 }
 
+
+/**
+ * Initialize display manager task parameters.
+ * 
+ * params: reference to the parameters to initialize.
+ */
+static void init_display_manager_params(tpars *params)
+{
+    ptask_param_init(*params);
+    ptask_param_deadline((*params), DISPLAY_DEADLINE, MILLI);
+    ptask_param_period((*params), DISPLAY_PERIOD, MILLI);
+    ptask_param_priority((*params), DISPLAY_PRIO);
+    ptask_param_activation((*params), NOW);
+}
 /*
  * Launch display manager task.
  */
 void launch_display_manager()
 {
     int task;
+    tpars params;
 
-    task = ptask_create_prio(display_manager,
-                             DISPLAY_PERIOD,
-                             DISPLAY_PRIO,
-                             NOW);
+    init_display_manager_params(&params);
+
+    task = ptask_create_param(display_manager, &params);
 
     assert(task >= 0);
 
