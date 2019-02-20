@@ -26,6 +26,33 @@
 #include <math.h>
 #include "gestor.h"
 
+// Fifo queue gestor.
+typedef struct
+{
+    int             freeIndex;  // Index of the next free element.
+    int             headIndex;  // Index of the next used element.
+    int             tailIndex;  // Index of the previus free element
+    int             next[N];    // Queue of available indexes.
+    sem_t           mutex;      // Mutex for the structure.
+    private_sem_t   write_sem;  // Private semaphore to extract a free element.
+    private_sem_t   read_sem;   // Private semaphore to extract a used element.
+}   fifo_queue_gestor_t;
+
+// Single missile queue gestor.
+typedef struct
+{
+    missile_t           queue[N];
+    fifo_queue_gestor_t gestor;
+}   missile_gestor_t;
+
+// Trajectory of a missile, used to compute defender starting point.
+typedef struct
+{
+    float   m;          // Angular coefficient of the trajectory.
+    float   b;          // Vertical origin of the tracjectory.
+    float   speed;      // Speed of the missile following the trajectory.
+}   trajectory_t;
+
 static missile_gestor_t atk_gestor;
 static missile_gestor_t def_gestor;
 

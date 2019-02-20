@@ -97,34 +97,6 @@ typedef struct
     int x, y;
 }   pos_t;
 
-// Possible type of cells for the environment.
-typedef enum
-{
-    WALL,
-    GOAL,
-    EMPTY,
-    ATK_MISSILE,
-    DEF_MISSILE
-}   cell_type_t;
-
-// Type of a single cell in the environment.
-typedef struct
-{
-    cell_type_t type;
-    int         value;  // Index of the contained missile or <0 if otherwise. 
-    int         target; // Target index assigned if attacker is discovered.
-}   cell_t;
-
-// Environment of the system. 
-typedef struct
-{
-    cell_t          cell[XWIN][YWIN];       // A cell for each screen pixel.
-    int             def_points, atk_points; // Current score.
-    int             count;                  // Threads using the structure.
-    private_sem_t   prio_sem[ENV_PRIOS];    // Priority queues.
-    sem_t           mutex;                  // Mutex for the structure.
-}   env_t;
-
 /*
  * Initialize environment and display manager.
  */

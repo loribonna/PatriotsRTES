@@ -49,17 +49,17 @@ must be run as superuser.
 The ptask library provides access to an interface for aperiodic and periodic
 tasks, built on top of the *pthread* library.  
 
-## Files
+## Modules
 
-The projects consists of 3 files:
-- `patriots.c`: contains the `main` function. Performs the initialization of the
+The projects consists of 3 modules:
+- `patriots`: contains the `main` function. Performs the initialization of the
 system and spawns the launcher and display tasks and then checks for a keyboard
 event.
-- `gestor.c`: contains the environment management and display functions. The 
+- `gestor`: contains the environment management and display functions. The 
 environment's main purpose is to keep the state of the data displayed and 
 permit to have a common container for the position of all entities on the 
 screen. This allows to check for collisions precisely and efficiently.
-- `launchers.c`: contains the functions necessary to create and manage the 
+- `launchers`: contains the functions necessary to create and manage the 
 movement of the missiles. It also contains the fifo-queue managers for the
 attacker and defender queues.
 
