@@ -18,6 +18,34 @@
 #include <assert.h>
 #include <math.h>
 
+// Possible type of cells for the environment.
+typedef enum
+{
+    WALL,
+    GOAL,
+    EMPTY,
+    ATK_MISSILE,
+    DEF_MISSILE
+}   cell_type_t;
+
+// Type of a single cell in the environment.
+typedef struct
+{
+    cell_type_t type;
+    int         value;  // Index of the contained missile or <0 if otherwise. 
+    int         target; // Target index assigned if attacker is discovered.
+}   cell_t;
+
+// Environment of the system. 
+typedef struct
+{
+    cell_t          cell[XWIN][YWIN];       // A cell for each screen pixel.
+    int             def_points, atk_points; // Current score.
+    int             count;                  // Threads using the structure.
+    private_sem_t   prio_sem[ENV_PRIOS];    // Priority queues.
+    sem_t           mutex;                  // Mutex for the structure.
+}   env_t;
+
 // Global environment used to maintain the status of the system.
 static env_t   env;
 
@@ -330,11 +358,12 @@ static void access_env(int prio)
  */
 static void release_env(int prio)
 {
-    int next_prio;
+    int next_prio, stop;
 
     sem_wait(&env.mutex);
 
     env.count--;
+    stop = 0;
 
     /* Wake a blocked task starting by the next one with lower prio. */
     next_prio = prio;
@@ -344,11 +373,13 @@ static void release_env(int prio)
         if (env.prio_sem[next_prio].blk)
         {
             sem_post(&(env.prio_sem[next_prio].sem));
-            return;
+            stop = 1;   // Wakes only one task.
         }
-    } while (next_prio != prio);
+    } while (!stop && next_prio != prio);
 
-    sem_post(&env.mutex);
+    if (!stop) {        // If no task was waken, just release mutex.
+        sem_post(&env.mutex);
+    }
 }
 
 /********************************************************************
@@ -409,8 +440,10 @@ static cell_type_t handle_collision_by_cell_type(cell_t *cell)
 static int handle_collision(missile_type_t missile_type, cell_t *cell)
 {
     cell_type_t type;
+    int         ret;
 
     type = handle_collision_by_cell_type(cell);
+    ret = 0;
 
     if (type != EMPTY)
     {
@@ -426,10 +459,10 @@ static int handle_collision(missile_type_t missile_type, cell_t *cell)
             atk_point();
         }
 
-        return 1;
+        ret = 1;
     }
 
-    return 0;
+    return ret;
 }
 
 /*
@@ -444,16 +477,17 @@ static int handle_collision(missile_type_t missile_type, cell_t *cell)
  */
 static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
 {
-    int             x, y;
+    int             x, y, ret;
     missile_type_t  missile_type;
     cell_type_t     cell_type;
 
     missile_type = missile->missile_type;
     cell_type = missile_to_cell_type(missile_type);
+    ret = 0;
 
-    for (x = xa; x < xb; x++)
+    for (x = xa; !ret && x < xb; x++)
     {
-        for (y = ya; y < yb; y++)
+        for (y = ya; !ret && y < yb; y++)
         {
             /* Check cell value and cell type to avoid self collisions. */
             if ((env.cell[x][y].value != missile->index ||
@@ -461,12 +495,12 @@ static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
                 !is_empty_cell(&(env.cell[x][y])) &&
                 handle_collision(missile_type, &(env.cell[x][y])))
             {
-                return 1;
+                ret = 1;    // Stop after first collision found.
             }
         }
     }
 
-    return 0;
+    return ret;
 }
 
 /*
@@ -478,21 +512,23 @@ static int collision_around(int xa, int ya, int xb, int yb, missile_t *missile)
  */
 static int handle_collisions_around_missile(missile_t *missile, int span)
 {
-    int xa, ya, xb, yb;
+    int xa, ya, xb, yb, ret;
 
     /* Prevent the missile to move outside borders. */
-    if (!check_borders(missile->x, missile->y))
+    ret = check_borders(missile->x, missile->y) ? 0 : 1;
+    
+    if (!ret)
     {
-        return 1;
+        /* Get start and ending point around missile. */
+        xa = missile->x - span >= 0 ? missile->x - span : 0;
+        ya = missile->y - span >= 0 ? missile->y - span : 0;
+        xb = missile->x + span < XWIN ? missile->x + span : XWIN;
+        yb = missile->y + span < YWIN ? missile->y + span : YWIN;
+
+        ret = collision_around(xa, ya, xb, yb, missile);
     }
 
-    /* Get start and ending point around missile. */
-    xa = missile->x - span >= 0 ? missile->x - span : 0;
-    ya = missile->y - span >= 0 ? missile->y - span : 0;
-    xb = missile->x + span < XWIN ? missile->x + span : XWIN;
-    yb = missile->y + span < YWIN ? missile->y + span : YWIN;
-
-    return collision_around(xa, ya, xb, yb, missile);
+    return ret;
 }
 
 /*
@@ -576,27 +612,30 @@ int update_missile_env(missile_t *missile, int oldx, int oldy)
  */
 pos_t scan_env_for_target_pos(int target)
 {
-    pos_t   pos;
+    pos_t   current_pos, ret_pos;
+    int     ret;
+
+    ret_pos.x = NONE;
+    ret_pos.y = NONE;
+    ret = 0;
 
     access_env(LOW_ENV_PRIO);
 
-    for (pos.x = 0; pos.x < XWIN; pos.x++)
+    for (current_pos.x = 0; !ret && current_pos.x < XWIN; current_pos.x++)
     {
-        for (pos.y = 0; pos.y < YWIN; pos.y++)
+        for (current_pos.y = 0; !ret && current_pos.y < YWIN; current_pos.y++)
         {
-            if (env.cell[pos.x][pos.y].target == target)
+            if (env.cell[current_pos.x][current_pos.y].target == target)
             {
-                release_env(LOW_ENV_PRIO);
-                return pos;
+                ret_pos = current_pos;
+                ret = 1;    // Stop checking if target is found.
             }
         }
     }
 
     release_env(LOW_ENV_PRIO);
 
-    pos.x = NONE;
-    pos.y = NONE;
-    return pos;
+    return ret_pos;
 }
 
 /*
@@ -609,14 +648,17 @@ pos_t scan_env_for_target_pos(int target)
 static int check_pixel(int x, int y)
 {
     cell_t  cell = env.cell[x][y];
+    int     ret;
+
+    ret = 0;
 
     /* Cell value is >=0 only at the missile position. */
     if (getpixel(screen, x, y) == ATTACKER_COLOR && cell.value >= 0)
     {
-        return !is_already_tracked(cell.target);
+        ret = !is_already_tracked(cell.target);
     }
 
-    return 0;
+    return ret;
 }
 
 /*
@@ -628,28 +670,29 @@ static int check_pixel(int x, int y)
  */
 int search_screen_for_target(int t_assign)
 {
-    int x, y;
+    int x, y, ret;
+
+    ret = 0;
 
     access_env(LOW_ENV_PRIO);
 
-    for (y = 0; y < YWIN; y++)
+    for (y = 0; !ret && y < YWIN; y++)
     {
-        for (x = 0; x < XWIN; x++)
+        for (x = 0; !ret && x < XWIN; x++)
         {
             if (check_pixel(x, y))
             {
                 /* Assign target index to an untracked attacker missile. */
                 assign_target_to_atk(env.cell[x][y].value, t_assign);
                 env.cell[x][y].target = t_assign;
-                release_env(LOW_ENV_PRIO);
-                return 1;
+                ret = 1;    // Stop at the first target found.
             }
         }
     }
 
     release_env(LOW_ENV_PRIO);
 
-    return 0;
+    return ret;
 }
 
 /********************************************************************
@@ -729,23 +772,19 @@ static void draw_missile(BITMAP *buffer, pos_t pos, missile_type_t type)
     int color;
 
     /* Don't need to draw missile outside borders. */
-    if (!check_borders(pos.x, pos.y))
+    if (check_borders(pos.x, pos.y))
     {
-        return;
-    }
+        if (type == ATTACKER)
+        {
+            color = ATTACKER_COLOR;
+        }
+        else
+        {
+            color = DEFENDER_COLOR;
+        }
 
-    if (type == ATTACKER)
-    {
-        color = ATTACKER_COLOR;
+        circlefill(buffer, pos.x, pos.y, MISSILE_RADIUS, color);
     }
-    else
-    {
-        color = DEFENDER_COLOR;
-    }
-
-    circlefill(buffer, pos.x, pos.y, MISSILE_RADIUS, color);
-
-    return;
 }
 
 /*

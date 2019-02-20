@@ -6,16 +6,62 @@ Project for Real-Time Embedded Systems course
 Simulate a set of Patriot defense missiles that identify enemy targets, predict
 their trajectories and are launched to catch them
 
+# User interface
+
+The commands available for the user are:
+- `space`: generate an attacker missile if the current number is not over limit.
+- `esc`: end the program.
+
+## Build and run PATRIOTS
+
+Use `make run` to check if display mode is available, compile and run the 
+application.  
+Alternatively, use `make` (or `make build`) to compile and then run the built
+executable created in `/build` as superuser with `sudo ./build/patriots` 
+(hypotizing to be in the base folder).
+Other available commands for `make` are:
+- `make clean`: clean the build directory.
+- `make all`: combine `clean` and `build` operations. This is also the default
+command executed with `make` (with no arguments).
+- `make check-env`: check if display is supported. This is just a basic control
+to avoid to run the program in environments that don't have display support. 
+This is only a necessary, but not sufficient, condition in order to enable the
+graphical environment.
+- `make compile`: compile the `.c` files and generate the corresponding `.o` in
+the `/build` directory.
+- `make link`: combine the `.o` files in the `/build` directory and generate 
+the executable file, always in the `/build` directory.  
+The command `make install` is not available.
+
+In order to use docker it is necessary to build the image, using the provided
+`Dockerfile`. Although it is possible to build the image, in order to run the 
+the newly created container is then necessary to run it interactively and with 
+GUI support.  
+It is worth mention that the developer that created the system did not manage 
+to run the application as a GUI docker application, so the application does not 
+feature any support for that.
+
 # Structure
 
 The project uses the library [ptask](https://github.com/glipari/ptask).  
 In order to succesfully spawn a task using the functions provided, the program 
 must be run as superuser.  
 The ptask library provides access to an interface for aperiodic and periodic
-tasks, built on top of the *pthread* library.
+tasks, built on top of the *pthread* library.  
 
-To generate an attacker missile, press `space`.  
-To end the program, press `esc`.
+## Modules
+
+The projects consists of 3 modules:
+- `patriots`: contains the `main` function. Performs the initialization of the
+system and spawns the launcher and display tasks and then checks for a keyboard
+event.
+- `gestor`: contains the environment management and display functions. The 
+environment's main purpose is to keep the state of the data displayed and 
+permit to have a common container for the position of all entities on the 
+screen. This allows to check for collisions precisely and efficiently.
+- `launchers`: contains the functions necessary to create and manage the 
+movement of the missiles. It also contains the fifo-queue managers for the
+attacker and defender queues.
 
 ## Tasks
 
