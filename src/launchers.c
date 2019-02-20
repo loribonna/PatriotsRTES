@@ -575,17 +575,15 @@ int is_already_tracked(int target)
 {
     int i, ret;
 
-    if (target < 0)
-    {
-        return 0;
-    }
-
     ret = 0;
 
-    /* Check if target index is already assigned to a defender missile. */
-    for (i = 0; i < N; i++)
+    if (target >= 0)
     {
-        ret |= def_gestor.queue[i].index == target;
+        /* Check if target index is already assigned to a defender missile. */
+        for (i = 0; i < N; i++)
+        {
+            ret |= def_gestor.queue[i].index == target;
+        }
     }
 
     return ret;
@@ -612,11 +610,16 @@ static float get_pos_distance(pos_t *pos_a, pos_t *pos_b)
  */
 static float get_line_m(pos_t *pos_a, pos_t *pos_b)
 {
-    if (pos_b->x == pos_a->x)   // If dx is 0 should not be accounted.
+    float   ret;
+
+    ret = 0.0;
+
+    if (pos_b->x != pos_a->x)   // If dx is 0 should not be accounted.
     {
-        return 0.0;
+        ret = (float)(pos_b->y - pos_a->y) / (float)(pos_b->x - pos_a->x);
     }
-    return (float)(pos_b->y - pos_a->y) / (float)(pos_b->x - pos_a->x);
+
+    return ret;
 }
 
 /*
@@ -756,10 +759,13 @@ static int get_start_x_position(int target)
     trajectory_t    trajectory;
     float           dt;
     pos_t           pos_a, pos_b;
+    int             expected_x;
 
     collect_positions(&pos_a, &pos_b, target, &dt);
 
     assert(dt != 0);
+
+    expected_x = pos_a.x;
 
     /* If the x coordinate doesn't change the calculus is useless. */
     if (pos_a.x != pos_b.x)
@@ -771,9 +777,10 @@ static int get_start_x_position(int target)
         fprintf(stderr, "DEF: Calculated speed for target %i: %f\n",
                 target, trajectory.speed);
 
-        return get_expected_position_x(&trajectory, &pos_b);
+        expected_x = get_expected_position_x(&trajectory, &pos_b);
     }
-    return pos_a.x;
+
+    return expected_x;
 }
 
 /*

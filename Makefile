@@ -1,4 +1,6 @@
 
+SHELL = /bin/sh
+
 # ----------------------------------------------------------------------
 # COMPILE OPTIONS
 # ----------------------------------------------------------------------
@@ -72,6 +74,14 @@ clean:
 # SECTION: RUN
 #	# ---------------------
 
+check-env:
+ifeq ($(DISPLAY),)
+	$(error Display mode NOT supported.)
+else
+	$(info Display mode supported.)
+endif
+
 # Clean, build and run as superuser (in order to use ptask).
-run: all
+run: check-env all
+	$(info Executing PATRIOTS (as superuser)...)
 	sudo $(OUT_BUILD)/$(MAIN)
