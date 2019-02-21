@@ -6,7 +6,7 @@
 // PI constant used in calculus.
 #define M_PI                    3.14159265358979323846
 // Division factor for deltatime.
-#define DELTA_FACTOR            1000
+#define DELTA_FACTOR            1000.0
 // Default value indicating no information in an integer variable.
 #define NONE                    -1
 // Number of nanoseconds in one second, used for conversions of time.
@@ -14,6 +14,8 @@
 // Maximum length of string of text in informative messages.
 #define INFO_LEN                150
 
+// Time scaling factor for high period tasks.
+#define TIME_SCALE              1.5
 // Missile radius, used for draw a missile and check collisions.
 #define MISSILE_RADIUS          5
 // Max number of missile threads -> Size of the queue.

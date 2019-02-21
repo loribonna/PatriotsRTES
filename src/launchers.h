@@ -31,11 +31,11 @@
 // Period of the attack launcher task.
 #define ATK_LAUNCHER_PERIOD     60
 // Priority of the attack launcher task.
-#define ATK_LAUNCHER_PRIO       1
+#define ATK_LAUNCHER_PRIO       80
 // Priority of the attack missile task.
-#define ATK_MISSILE_PRIO        2
+#define ATK_MISSILE_PRIO        81
 // Period of the attack missile task.
-#define ATK_MISSILE_PERIOD      10
+#define ATK_MISSILE_PERIOD      60
 // Relative deadline of the attacker missile task.
 #define ATK_MISSILE_DEADLINE    (ATK_MISSILE_PERIOD)
 
@@ -51,18 +51,18 @@
 #define DEF_SLEEP_DELAY         50 * 1000 * 1000 // 50 milliseconds
 
 // Period of the defender launcher task.
-#define DEF_LAUNCHER_PERIOD     40
+#define DEF_LAUNCHER_PERIOD     50
 // Priority of the defender launcher task.
-#define DEF_LAUNCHER_PRIO       1
+#define DEF_LAUNCHER_PRIO       80
 // Priority of the defender missile task.
-#define DEF_MISSILE_PRIO        2
+#define DEF_MISSILE_PRIO        81
 // Period of the defender missile task.
-#define DEF_MISSILE_PERIOD      15
+#define DEF_MISSILE_PERIOD      45
 // Relative deadline of the defender missile task.
 #define DEF_MISSILE_DEADLINE    (DEF_MISSILE_PERIOD)
 
 // Precision used in trajectory calculation (percentual)
-#define TRAJECTORY_PRECISION    50
+#define TRAJECTORY_PRECISION    30
 // Ubber extremity to limit trajectory calculation loop.
 #define SAMPLE_LIMIT            (2 * TRAJECTORY_PRECISION)
 // Minimum number of samples to collect to calculate the trajectory
