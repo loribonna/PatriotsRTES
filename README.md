@@ -12,6 +12,18 @@ The commands available for the user are:
 - `space`: generate an attacker missile if the current number is not over limit.
 - `esc`: end the program.
 
+## Low performance environments
+
+In order to utilize the software under low performance environments it was 
+introduced the `TIME_SCALE` MACRO (with default 1.5). This parameter is used to 
+scale the deltatime (to calculate movements) in order to use higher periods for
+missiles.  
+If this time dilation factor is set larger, the missiles will take more time to 
+perform a movement with respect to the space. 
+
+To make the changes to the time scaling factor effective is necessary to 
+rebuild the program, with the commands presented in the following section.
+
 ## Build and run PATRIOTS
 
 Use `make run` to check if display mode is available, compile and run the 
@@ -129,7 +141,8 @@ The static parameters of the algoritm are:
  * `DEF_MISSILE_START_Y`: vertical starting point the defender missiles.
  * `DEF_MISSILE_SPEED`: speed of the defender missiles.
  * `SAMPLE_LIMIT`: upper bound for the calculation, to avoid infinite loop.
- * `EPSILON`: Level of precision required.
+ * `EPSILON`: level of precision required.
+ * `TIME_SCALE`: time scaling factor for high period tasks.
 
 The main parameters of the algoritm are:
  * `x_min`: starting point of the horizontal window where the intercept can be.

@@ -1,5 +1,6 @@
 
 #include "patriots.h"
+#include <stdio.h>
 #include <allegro.h>
 #include "ptask.h"
 #include "launchers.h"
@@ -20,6 +21,8 @@ void init()
     init_launchers();
 
     ptask_init(SCHED_RR, GLOBAL, NO_PROTOCOL);
+
+    fprintf(stderr, "Launching PATRIOTS with time scaling: %f\n", TIME_SCALE);
 }
 
 /*
