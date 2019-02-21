@@ -50,8 +50,12 @@ all: clean build
 # BUILD
 #	# ---------------------
 
+# Check if the build directory exists and creates it if it doesn't.
+check-build:
+	if ! [ -d $(OUT_BUILD) ]; then mkdir $(OUT_BUILD); fi
+
 # Build.
-build: compile link 
+build: check-build compile link 
 
 # Compile all specified source files.
 compile: $(SOURCE_FILES)
@@ -74,6 +78,7 @@ clean:
 # SECTION: RUN
 #	# ---------------------
 
+# Check if the current environment has display support.
 check-env:
 ifeq ($(DISPLAY),)
 	$(error Display mode NOT supported.)
