@@ -40,11 +40,11 @@
 ********************************************************************/
 
 // Refresh rate of the screen (updates per second)
-#define REFRESH_RATE        60
+#define REFRESH_RATE        20
 // Period of the display manager task.
 #define DISPLAY_PERIOD      ((int)(1000 / REFRESH_RATE))
 // Priority of the display manager task.
-#define DISPLAY_PRIO        3
+#define DISPLAY_PRIO        82
 // Relative deadline of the display manager task.
 #define DISPLAY_DEADLINE    (DISPLAY_PERIOD)
 

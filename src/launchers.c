@@ -165,7 +165,7 @@ void init_launchers()
  */
 static float get_deltatime(int task_index, int unit)
 {
-    return (float)ptask_get_period(task_index, unit) / DELTA_FACTOR;
+    return (float)ptask_get_period(task_index, unit) / (DELTA_FACTOR * TIME_SCALE);
 }
 
 /*
@@ -734,8 +734,9 @@ static float calc_speed(pos_t *pos_a, pos_t *pos_b, float t_time)
  */
 static float calc_dt(struct timespec t_start, struct timespec t_end)
 {
-    return (float)(t_end.tv_sec - t_start.tv_sec) +
-           (t_end.tv_nsec - t_start.tv_nsec) / NANOSECOND_TO_SECONDS;
+    return ((float)(t_end.tv_sec - t_start.tv_sec) +
+           (t_end.tv_nsec - t_start.tv_nsec) / NANOSECOND_TO_SECONDS) / 
+           TIME_SCALE; // Compensate time scaling factor
 }
 
 /*
